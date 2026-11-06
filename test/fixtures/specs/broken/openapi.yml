@@ -1,0 +1,26 @@
+# Fixture cho unit test: OpenAPI hợp lệ nhưng vi phạm luật của gateway.
+# Có đúng 3 lỗi, test kiểm tra gateway báo đủ cả 3 trong một lần.
+openapi: 3.0.3
+info:
+  title: Broken
+  version: 1.0.0
+paths:
+  /a:
+    get:
+      # Lỗi 1: thiếu operationId
+      responses:
+        '200': { description: OK }
+  /b:
+    get:
+      operationId: '' # Lỗi 2: operationId rỗng
+      responses:
+        '200': { description: OK }
+  /c:
+    get:
+      operationId: shared.op
+      responses:
+        '200': { description: OK }
+    post:
+      operationId: shared.op # Lỗi 3: trùng operationId
+      responses:
+        '200': { description: OK }

@@ -1,114 +1,76 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# API Gateway
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Gateway contract-first: đọc một file OpenAPI, nhận HTTP từ client, dịch thành message RPC
+(`@MessagePattern` = `operationId`) gửi qua TCP tới service đang xử lý pattern đó.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+- Thiết kế và quyết định: [PLAN.md](./PLAN.md)
+- Kiến thức ôn phỏng vấn: [KNOWLEDGE.md](./KNOWLEDGE.md)
 
-## Description
+## Yêu cầu
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- Node **≥ 24.9** để chạy test (NestJS 12 là ESM-only). Node 22 chạy được app nhưng không chạy được Jest.
 
-## Project setup
+## Chạy local
 
 ```bash
-$ npm install
+# Terminal 1: service giả (TCP :4001)
+npm exec nx run echo-service:start:dev
+
+# Terminal 2: gateway (HTTP :3000) cho project "example"
+GATEWAY_PROJECT=example GATEWAY_DISCOVERY_FILE=discovery.local.json \
+  npm exec nx run api-gateway:start:dev
+
+# Terminal 3
+curl -i localhost:3000/users/42
 ```
 
-## Compile and run the project
+Thử load balancing và failover với instance thứ hai (đã khai báo sẵn trong `discovery.local.json`):
 
 ```bash
-# development
-$ npm run start
+# Terminal 4: instance thứ hai (TCP :4002)
+ECHO_PORT=4002 npm exec nx run echo-service:start:dev
 
-# watch mode
-$ npm run start:dev
+# Gọi nhiều lần: log của hai echo nhận lần lượt ([echo:4001] / [echo:4002])
+for i in 1 2 3 4; do curl -s localhost:3000/users/$i > /dev/null; done
 
-# production mode
-$ npm run start:prod
+# Tắt một echo: mọi request vẫn 200 nhờ failover (log gateway có cảnh báo "failing over")
 ```
 
-## Run tests
+Khi chỉ chạy một echo, request đến lượt `echo-2` vẫn thành công nhờ failover.
+
+Thử các nhánh lỗi:
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+curl -i localhost:3000/users/missing                 # 404 USER_NOT_FOUND (lỗi nghiệp vụ từ service)
+curl -i localhost:3000/users/slow                    # 504 UPSTREAM_TIMEOUT
+curl -i -X PUT localhost:3000/users/42               # 405 + Allow
+curl -i localhost:3000/nope                          # 404 ROUTE_NOT_FOUND
+curl -i -X POST localhost:3000/auth/logout           # 503 NO_INSTANCE
 ```
 
-## Deployment
+## Biến môi trường
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+| Biến | Bắt buộc | Mặc định | Ý nghĩa |
+|---|---|---|---|
+| `GATEWAY_PROJECT` | Có | - | Project cần phục vụ (`specs/<project>/openapi.yml`) |
+| `GATEWAY_DISCOVERY_FILE` | Có | - | File JSON của StaticDiscovery |
+| `GATEWAY_SPECS_DIR` | Không | `./specs` | Thư mục chứa spec |
+| `GATEWAY_SPEC_FILE` | Không | `openapi.yml` | Tên file spec |
+| `GATEWAY_RPC_TIMEOUT_MS` | Không | `10000` | Timeout chờ service (504) |
+| `GATEWAY_BODY_LIMIT` | Không | `1048576` | Body tối đa, byte (413) |
+| `GATEWAY_FAILOVER_MAX_ATTEMPTS` | Không | `3` | Số instance tối đa thử cho một request (`1` = tắt failover) |
+| `PORT` | Không | `3000` | Cổng HTTP |
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## Thêm một project mới
+
+1. Tạo `specs/<project>/openapi.yml`. Mọi operation phải có `operationId` không rỗng, không trùng.
+2. Service xử lý bằng `@MessagePattern('<operationId>')`, nhận `GatewayRequest`
+   (hợp đồng: `src/gateway/contracts.ts`).
+3. Khai báo instance và pattern trong file discovery (sau này service tự đăng ký vào registry).
+
+## Test
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npm exec nx test api-gateway                 # unit + integration
+npm exec nx run api-gateway:test:e2e         # e2e: HTTP → gateway → TCP → microservice
 ```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Observability
-
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
-
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
-
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observer](https://observer.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).

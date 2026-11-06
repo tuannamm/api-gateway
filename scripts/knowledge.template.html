@@ -1,0 +1,1039 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sổ tay API Gateway</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+/* Layout: thanh tab cố định trên cùng; nội dung giới hạn ~1180px; tab Kiến thức là lưới sidebar + bài đọc.
+   Thế giới của chủ đề: gói tin đi qua gateway. Cam = gói tin/điểm nhấn, chàm = control plane, xanh ngọc = data plane. */
+:root {
+  --bg: #f3f5f8;
+  --surface: #ffffff;
+  --surface-2: #e9edf2;
+  --ink: #17202b;
+  --muted: #5a6574;
+  --line: #d6dce4;
+  --accent: #c2410c;
+  --accent-soft: #fbe5d8;
+  --control: #4352c9;
+  --control-soft: #e3e6fb;
+  --data: #0d7d72;
+  --data-soft: #d6f0ec;
+  --ok: #2b7a3f;
+  --ok-soft: #dcf0e1;
+  --learn: #2559c7;
+  --learn-soft: #dfe8fb;
+  --todo: #6b7482;
+  --todo-soft: #e6e9ee;
+  --danger: #b4321f;
+  --danger-soft: #f9e0db;
+  --font-body: "Be Vietnam Pro", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --radius: 10px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e131a; --surface: #151c25; --surface-2: #1d2631; --ink: #e5e9ef; --muted: #98a3b3; --line: #2a3441;
+    --accent: #ff8f57; --accent-soft: #3a2418; --control: #9aa4ff; --control-soft: #23284a; --data: #45c9b7; --data-soft: #12322e;
+    --ok: #63c47f; --ok-soft: #15301d; --learn: #7eaaff; --learn-soft: #1a2846; --todo: #8c96a4; --todo-soft: #222b36;
+    --danger: #f2826c; --danger-soft: #3a1c17; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e131a; --surface: #151c25; --surface-2: #1d2631; --ink: #e5e9ef; --muted: #98a3b3; --line: #2a3441;
+  --accent: #ff8f57; --accent-soft: #3a2418; --control: #9aa4ff; --control-soft: #23284a; --data: #45c9b7; --data-soft: #12322e;
+  --ok: #63c47f; --ok-soft: #15301d; --learn: #7eaaff; --learn-soft: #1a2846; --todo: #8c96a4; --todo-soft: #222b36;
+  --danger: #f2826c; --danger-soft: #3a1c17; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.65 var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+[hidden] { display: none !important; }
+a { color: var(--learn); }
+code, pre, kbd { font-family: var(--font-mono); font-size: 0.86em; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+h1, h2, h3 { text-wrap: balance; line-height: 1.2; margin: 0; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.eyebrow { font: 600 11px/1 var(--font-mono); letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+
+/* ---------- Header ---------- */
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+header.top .wrap { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding-block: 10px; }
+.brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+.brand b { font-weight: 800; font-size: 17px; letter-spacing: -0.01em; }
+.brand span { font: 500 12px var(--font-mono); color: var(--muted); }
+nav.tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+nav.tabs a {
+  text-decoration: none; color: var(--muted); font-weight: 600; font-size: 14px;
+  padding: 6px 12px; border-radius: 999px;
+}
+nav.tabs a:hover { color: var(--ink); background: var(--surface-2); }
+nav.tabs a[aria-current="page"] { color: var(--surface); background: var(--ink); }
+.icon-btn {
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px;
+  font: 600 12px var(--font-mono); padding: 6px 10px; cursor: pointer;
+}
+main { padding-block: 28px 64px; }
+
+/* ---------- Shared bits ---------- */
+.chip { display: inline-flex; align-items: center; gap: 6px; font: 600 11.5px/1 var(--font-mono); padding: 4px 8px; border-radius: 999px; white-space: nowrap; }
+.chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.chip.done { color: var(--ok); background: var(--ok-soft); }
+.chip.theory { color: var(--learn); background: var(--learn-soft); }
+.chip.todo { color: var(--todo); background: var(--todo-soft); }
+.chip.basic { color: var(--ok); background: var(--ok-soft); }
+.chip.mid { color: #a16207; background: #fbefcf; }
+.chip.hard { color: var(--danger); background: var(--danger-soft); }
+:root[data-theme="dark"] .chip.mid { color: #e8c062; background: #3a2f14; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .chip.mid { color: #e8c062; background: #3a2f14; } }
+.status-code { font: 700 13px var(--font-mono); padding: 2px 7px; border-radius: 6px; background: var(--surface-2); }
+.status-code.s2 { color: var(--ok); background: var(--ok-soft); }
+.status-code.s4 { color: #a16207; background: #fbefcf; }
+.status-code.s5 { color: var(--danger); background: var(--danger-soft); }
+.btn {
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  font: 600 14px var(--font-body); padding: 8px 14px; border-radius: 8px; cursor: pointer;
+}
+.btn:hover { border-color: var(--muted); }
+a.btn { text-decoration: none; display: inline-flex; align-items: center; }
+.btn.primary { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.btn.good { background: var(--ok); color: var(--surface); border-color: var(--ok); }
+.btn.again { color: var(--accent); border-color: var(--accent); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.section-head h2 { font-size: 21px; font-weight: 700; }
+.section-head p { margin: 0; color: var(--muted); max-width: 62ch; }
+section.block { margin-top: 44px; }
+
+/* ---------- Overview ---------- */
+.hero { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 32px; align-items: end; }
+.hero h1 { font-size: clamp(30px, 4.6vw, 46px); font-weight: 800; letter-spacing: -0.025em; margin-top: 10px; }
+.hero h1 em { font-style: normal; color: var(--accent); }
+.hero p.lead { font-size: 17px; color: var(--muted); max-width: 58ch; margin: 14px 0 0; }
+.meter { padding: 18px; display: grid; gap: 14px; }
+.meter-row { display: grid; gap: 6px; }
+.meter-row .label { display: flex; justify-content: space-between; font-size: 13.5px; }
+.meter-row .label b { font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
+.bar { height: 10px; border-radius: 999px; background: var(--surface-2); display: flex; overflow: hidden; }
+.bar i { display: block; height: 100%; }
+.bar .b-done { background: var(--ok); } .bar .b-theory { background: var(--learn); } .bar .b-known { background: var(--ok); } .bar .b-review { background: var(--accent); }
+.legend { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.diagram { overflow-x: auto; padding: 16px; }
+.diagram svg { display: block; width: 100%; min-width: 760px; height: auto; }
+.diagram .node rect { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+.diagram .node.gw rect { fill: var(--accent-soft); stroke: var(--accent); }
+.diagram .node.svc rect { fill: var(--data-soft); stroke: var(--data); }
+.diagram .node.infra rect { fill: var(--control-soft); stroke: var(--control); }
+.diagram text { fill: var(--ink); font-family: var(--font-body); font-size: 14px; font-weight: 600; }
+.diagram text.small { fill: var(--muted); font: 500 11.5px var(--font-mono); }
+.diagram .edge { stroke: var(--ink); stroke-width: 1.6; fill: none; }
+.diagram .edge.tcp { stroke: var(--data); }
+.diagram .edge.dash { stroke: var(--control); stroke-dasharray: 5 5; }
+.diagram .edge.event { stroke: var(--muted); stroke-dasharray: 2 4; }
+.diagram marker path { fill: context-stroke; }
+.diagram .arrow-ink { fill: var(--ink); } .diagram .arrow-data { fill: var(--data); } .diagram .arrow-ctrl { fill: var(--control); } .diagram .arrow-muted { fill: var(--muted); }
+
+.planes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.plane { padding: 20px; border-top: 4px solid var(--control); }
+.plane.data { border-top-color: var(--data); }
+.plane h3 { font-size: 18px; margin-bottom: 4px; }
+.plane .when { font: 500 12.5px var(--font-mono); color: var(--muted); }
+.plane ol { margin: 14px 0 0; padding-left: 20px; display: grid; gap: 6px; }
+.plane ol code { color: var(--muted); }
+.plane .rule { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); font-size: 14px; color: var(--muted); }
+
+/* Simulator */
+.sim { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 16px; }
+.scenarios { padding: 8px; display: grid; gap: 2px; align-content: start; }
+.scenarios button {
+  text-align: left; border: 0; background: transparent; color: var(--ink); font: inherit;
+  padding: 9px 10px; border-radius: 8px; cursor: pointer; display: grid; gap: 2px;
+}
+.scenarios button:hover { background: var(--surface-2); }
+.scenarios button[aria-pressed="true"] { background: var(--surface-2); box-shadow: inset 3px 0 0 var(--accent); }
+.scenarios .req { font: 500 12.5px var(--font-mono); color: var(--muted); overflow-wrap: anywhere; }
+.scenarios .name { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.sim-main { padding: 18px; display: grid; gap: 18px; min-width: 0; }
+.track { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; }
+.step {
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: var(--surface);
+  font-size: 12.5px; line-height: 1.3; cursor: pointer; text-align: left; color: var(--ink); font-family: inherit;
+  display: grid; gap: 4px; align-content: start; min-height: 72px;
+}
+.step .no { font: 700 11px var(--font-mono); color: var(--muted); }
+.step.passed { border-color: var(--data); background: var(--data-soft); }
+.step.passed .no { color: var(--data); }
+.step.stopped { border-color: var(--danger); background: var(--danger-soft); }
+.step.stopped .no { color: var(--danger); }
+.step.skipped { opacity: 0.45; }
+.step[aria-current="step"] { box-shadow: 0 0 0 2px var(--ink); }
+.step-detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.step-detail h3 { font-size: 16px; margin-bottom: 6px; }
+.step-detail p { margin: 0 0 8px; }
+.step-detail .file { font: 500 12.5px var(--font-mono); color: var(--control); }
+.fails { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.response { background: var(--surface-2); border-radius: 8px; padding: 12px 14px; overflow-x: auto; margin: 0; font-size: 12.5px; line-height: 1.55; white-space: pre; }
+.verdict { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 14px; }
+
+/* ---------- Knowledge ---------- */
+.kgrid { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 28px; align-items: start; }
+.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 72px); max-height: calc(100vh - 100px); overflow-y: auto; padding: 10px; }
+.toc input { width: 100%; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 8px; padding: 8px 10px; font: inherit; margin-bottom: 8px; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.toc a { display: grid; grid-template-columns: 26px minmax(0, 1fr) 10px; gap: 6px; align-items: center; text-decoration: none; color: var(--ink); padding: 6px 8px; border-radius: 6px; font-size: 13.5px; line-height: 1.35; }
+.toc a:hover { background: var(--surface-2); }
+.toc a[aria-current="true"] { background: var(--surface-2); font-weight: 600; }
+.toc .num { font: 600 11.5px var(--font-mono); color: var(--muted); }
+.toc .dot { width: 8px; height: 8px; border-radius: 50%; }
+.dot.done { background: var(--ok); } .dot.theory { background: var(--learn); } .dot.todo { background: transparent; box-shadow: inset 0 0 0 1.5px var(--todo); }
+.toc-toggle { display: none; }
+
+article.topic { min-width: 0; }
+.topic-head { display: grid; gap: 10px; padding-bottom: 18px; border-bottom: 1px solid var(--line); margin-bottom: 22px; }
+.topic-head h1 { font-size: clamp(24px, 3.4vw, 34px); font-weight: 800; letter-spacing: -0.02em; }
+.topic-meta { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; color: var(--muted); font-size: 13.5px; }
+.prose { max-width: 76ch; }
+.prose p, .prose li { overflow-wrap: break-word; }
+.prose p { margin: 0 0 12px; }
+.prose ul, .prose ol { margin: 0 0 14px; padding-left: 22px; display: grid; gap: 4px; }
+.prose code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+.prose pre { background: var(--surface-2); padding: 14px 16px; border-radius: 8px; overflow-x: auto; margin: 0 0 16px; line-height: 1.5; }
+.prose pre code { background: none; padding: 0; }
+.prose blockquote { margin: 0 0 14px; padding: 10px 14px; border-left: 3px solid var(--line); color: var(--muted); }
+.prose h3 { font-size: 17px; margin: 22px 0 10px; }
+.table-wrap { overflow-x: auto; margin: 0 0 18px; border: 1px solid var(--line); border-radius: 8px; }
+.prose table { border-collapse: collapse; width: 100%; font-size: 14px; }
+.prose th, .prose td { text-align: left; vertical-align: top; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.prose th { background: var(--surface-2); font-weight: 600; font-size: 13px; }
+.prose tr:last-child td { border-bottom: 0; }
+.callout { border-radius: var(--radius); padding: 14px 16px 2px; margin: 0 0 16px; border: 1px solid var(--line); background: var(--surface); }
+.callout > p:first-child { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; }
+.callout > p:first-child strong { font-weight: 700; }
+.callout.questions { border-color: var(--learn); background: var(--learn-soft); }
+.callout.questions > p:first-child { color: var(--learn); }
+.callout.trap { border-color: var(--accent); background: var(--accent-soft); }
+.callout.trap > p:first-child { color: var(--accent); }
+.callout.sample { border-color: var(--ok); background: var(--ok-soft); }
+.callout.sample > p:first-child { color: var(--ok); }
+.callout.incode { border-color: var(--control); background: var(--control-soft); }
+.callout.incode > p:first-child { color: var(--control); }
+.callout.self { border-style: dashed; background: transparent; }
+.callout.self blockquote { border: 0; padding: 0; font-style: italic; }
+.topic-foot { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 30px; padding-top: 18px; border-top: 1px solid var(--line); }
+.topic-foot a { text-decoration: none; }
+.practice-link { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 16px; margin-top: 22px; }
+
+/* ---------- Practice ---------- */
+.filters { display: flex; flex-wrap: wrap; gap: 16px 24px; align-items: center; margin-bottom: 16px; }
+.fgroup { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.fgroup .eyebrow { margin-right: 4px; }
+.pill { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 5px 11px; font: 600 13px var(--font-body); cursor: pointer; }
+.pill[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.card { padding: 26px; display: grid; gap: 18px; min-height: 320px; align-content: start; }
+.card-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; color: var(--muted); font-size: 13px; }
+.card-q { font-size: clamp(19px, 2.4vw, 24px); font-weight: 700; line-height: 1.35; letter-spacing: -0.01em; text-wrap: pretty; }
+.card-q strong { font-weight: 700; }
+.hint { border-left: 3px solid var(--ok); padding: 10px 14px; background: var(--ok-soft); border-radius: 0 8px 8px 0; }
+.hint .eyebrow { color: var(--ok); display: block; margin-bottom: 6px; }
+.refs { display: flex; gap: 8px; flex-wrap: wrap; font-size: 13.5px; }
+.refs a { text-decoration: none; border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; color: var(--ink); }
+.refs a:hover { border-color: var(--learn); color: var(--learn); }
+.card-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.card-actions .spacer { flex: 1; }
+.mark { font: 600 12px var(--font-mono); }
+.mark.known { color: var(--ok); } .mark.review { color: var(--accent); }
+.practice-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.counter { font: 600 13px var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.kbd-help { font-size: 12.5px; color: var(--muted); margin-top: 12px; }
+kbd { border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--surface); }
+.empty { padding: 40px 26px; text-align: center; color: var(--muted); }
+
+/* ---------- Glossary ---------- */
+.gloss-search { width: min(100%, 420px); border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 9px 12px; font: inherit; margin-bottom: 16px; }
+.gloss { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.term { padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.term b { font-weight: 700; }
+.term span { color: var(--muted); font-size: 14px; }
+.term code { background: var(--surface-2); padding: 1px 4px; border-radius: 4px; }
+
+footer { color: var(--muted); font-size: 12.5px; padding-block: 0 32px; }
+
+/* ---------- Slides ---------- */
+.slide-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.stage { display: grid; place-items: center; }
+.slide-frame {
+  width: min(100%, calc((100vh - 240px) * 16 / 9)); aspect-ratio: 16 / 9; max-width: 100%;
+  container-type: inline-size; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+}
+.stage:fullscreen { background: var(--bg); width: 100vw; height: 100vh; }
+.stage:fullscreen .slide-frame { width: min(100vw, calc(100vh * 16 / 9)); border-radius: 0; border: 0; }
+.slide {
+  height: 100%; overflow: auto; display: flex; flex-direction: column; justify-content: center; gap: 2.2cqw;
+  padding: 5cqw 7cqw 6cqw; font-size: 2.15cqw; line-height: 1.5; position: relative;
+  border-top: 0.6cqw solid var(--accent);
+}
+.slide > * { margin: 0; }
+.slide h1 { font-size: 6cqw; font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; }
+.slide h2 { font-size: 3.6cqw; font-weight: 800; letter-spacing: -0.02em; }
+.slide.cover { justify-content: flex-end; padding-bottom: 8cqw; background: linear-gradient(135deg, var(--accent-soft), transparent 60%); }
+.slide.cover h1 { color: var(--ink); max-width: 18ch; }
+.slide.cover p:first-of-type { font-size: 2.8cqw; color: var(--ink); max-width: 36ch; }
+.slide.cover p { color: var(--muted); }
+.slide ul, .slide ol { padding-left: 1.4em; display: grid; gap: 0.9cqw; }
+.slide strong { color: var(--accent); }
+.slide code { font-size: 0.85em; background: var(--surface-2); padding: 0.1em 0.35em; border-radius: 0.3em; }
+.slide pre { background: var(--surface-2); border-radius: 1cqw; padding: 1.6cqw 2cqw; font-size: 1.6cqw; line-height: 1.45; overflow: auto; }
+.slide pre code { background: none; padding: 0; font-size: 1em; }
+.slide table { border-collapse: collapse; width: 100%; font-size: 1.85cqw; }
+.slide th, .slide td { text-align: left; vertical-align: top; padding: 1cqw 1.4cqw; border-bottom: 1px solid var(--line); }
+.slide th { color: var(--muted); font-weight: 600; font-size: 1.5cqw; text-transform: uppercase; letter-spacing: 0.06em; }
+.slide th:empty { padding: 0; border: 0; }
+.slide td strong { color: var(--ink); }
+.slide .slide-no { position: absolute; right: 3cqw; bottom: 2.4cqw; font: 600 1.3cqw var(--font-mono); color: var(--muted); }
+.slide .slide-brand { position: absolute; left: 7cqw; bottom: 2.4cqw; font: 600 1.3cqw var(--font-mono); color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+.slide .diagram { padding: 0; border: 0; background: none; overflow: visible; }
+.slide .diagram svg { min-width: 0; max-height: 34cqw; }
+.slide .planes { gap: 2cqw; }
+.slide .plane { padding: 1.8cqw 2cqw; border-radius: 1cqw; }
+.slide .plane h3 { font-size: 2.1cqw; margin-bottom: 0; }
+.slide .plane .eyebrow { font-size: 1.15cqw; }
+.slide .plane .when, .slide .plane .rule { display: none; }
+.slide .plane ol { font-size: 1.55cqw; gap: 0.4cqw; margin-top: 1.2cqw; line-height: 1.4; }
+.slide .plane ol code { font-size: 0.78em; background: none; padding: 0; }
+.slide-progress { height: 3px; background: var(--surface-2); border-radius: 999px; margin-top: 12px; overflow: hidden; }
+.slide-progress i { display: block; height: 100%; background: var(--accent); }
+.slide-notes { margin-top: 14px; padding: 14px 18px; font-size: 15px; }
+.slide-notes p { margin: 0; }
+.slide-notes .eyebrow { display: block; margin-bottom: 6px; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 920px) {
+  .hero, .planes, .sim, .step-detail { grid-template-columns: minmax(0, 1fr); }
+  .track { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .kgrid { grid-template-columns: minmax(0, 1fr); }
+  .toc { position: static; max-height: none; }
+  .toc-toggle { display: inline-flex; margin-bottom: 10px; }
+  .toc.collapsed ol, .toc.collapsed input { display: none; }
+}
+@media (max-width: 480px) {
+  .track { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .card { padding: 18px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .step, .pill, .btn, nav.tabs a { transition: background-color 0.15s, border-color 0.15s, color 0.15s; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><b>Sổ tay API Gateway</b><span id="gen-date"></span></div>
+    <nav class="tabs" aria-label="Các phần">
+      <a href="#overview" data-view="overview">Tổng quan</a>
+      <a href="#knowledge" data-view="knowledge">Kiến thức</a>
+      <a href="#practice" data-view="practice">Luyện câu hỏi</a>
+      <a href="#glossary" data-view="glossary">Từ điển</a>
+      <a href="#slides" data-view="slides">Slide</a>
+    </nav>
+    <button class="icon-btn" id="theme-btn" type="button" title="Đổi giao diện sáng/tối">Giao diện: hệ thống</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- ================= OVERVIEW ================= -->
+  <section id="view-overview" data-view-panel="overview">
+    <div class="hero">
+      <div>
+        <span class="eyebrow">Contract-first · HTTP → TCP RPC · NestJS + Fastify</span>
+        <h1>Một file OpenAPI, <em>một gateway</em> dùng lại cho mọi project.</h1>
+        <p class="lead"><code>operationId</code> trong spec chính là <code>@MessagePattern</code> của service. Gateway tra route, hỏi service discovery xem ai xử lý pattern đó, rồi gửi message qua TCP.</p>
+      </div>
+      <div class="panel meter" id="meter"></div>
+    </div>
+
+    <section class="block">
+      <div class="section-head">
+        <h2>Kiến trúc</h2>
+        <p>Gateway lo traffic bắc-nam (client vào hệ thống). Event giữa các service đi qua RabbitMQ, gateway không chạm tới.</p>
+      </div>
+      <div class="panel diagram" id="arch-diagram">
+        <svg viewBox="0 0 960 420" role="img" aria-label="Sơ đồ kiến trúc: Client gọi HTTP vào API Gateway, gateway gửi message TCP tới auth worker, user-service, order-service; gateway hỏi Service Registry; service đăng ký pattern vào registry; service phát event qua RabbitMQ; auth worker gọi Keycloak; gateway tải public key từ Keycloak.">
+          <defs>
+            <marker id="m-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow-ink" d="M0 0L10 5L0 10z"/></marker>
+            <marker id="m-data" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow-data" d="M0 0L10 5L0 10z"/></marker>
+            <marker id="m-ctrl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow-ctrl" d="M0 0L10 5L0 10z"/></marker>
+            <marker id="m-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow-muted" d="M0 0L10 5L0 10z"/></marker>
+          </defs>
+          <!-- edges -->
+          <path class="edge" d="M140 210 H196" marker-end="url(#m-ink)"/>
+          <text class="small" x="146" y="200">HTTP</text>
+          <path class="edge tcp" d="M420 190 C 480 190, 490 88, 556 88" marker-end="url(#m-data)"/>
+          <path class="edge tcp" d="M420 210 H556" marker-end="url(#m-data)"/>
+          <path class="edge tcp" d="M420 230 C 480 230, 490 332, 556 332" marker-end="url(#m-data)"/>
+          <text class="small" x="430" y="203">TCP send(pattern)</text>
+          <path class="edge dash" d="M310 270 V336" marker-end="url(#m-ctrl)" marker-start="url(#m-ctrl)"/>
+          <text class="small" x="318" y="306">resolve(project, pattern)</text>
+          <path class="edge dash" d="M650 360 V376 H424" marker-end="url(#m-ctrl)"/>
+          <text class="small" x="440" y="396">service tự đăng ký + danh sách pattern</text>
+          <path class="edge dash" d="M310 150 V36 H870 V56" marker-end="url(#m-ctrl)"/>
+          <text class="small" x="330" y="28">JWKS: tải public key để verify JWT</text>
+          <path class="edge" d="M740 88 H796" marker-end="url(#m-ink)"/>
+          <path class="edge event" d="M740 210 C 770 210, 770 262, 796 262" marker-end="url(#m-muted)"/>
+          <path class="edge event" d="M740 332 C 770 332, 770 282, 796 282" marker-end="url(#m-muted)"/>
+          <text class="small" x="806" y="316">event</text>
+          <!-- nodes -->
+          <g class="node"><rect x="20" y="182" width="120" height="56" rx="10"/><text x="80" y="215" text-anchor="middle">Client</text></g>
+          <g class="node gw"><rect x="200" y="150" width="220" height="120" rx="12"/>
+            <text x="310" y="184" text-anchor="middle">API Gateway</text>
+            <text class="small" x="310" y="210" text-anchor="middle">spec → route trie</text>
+            <text class="small" x="310" y="230" text-anchor="middle">match → resolve → send</text>
+            <text class="small" x="310" y="250" text-anchor="middle">lỗi → RFC 9457</text>
+          </g>
+          <g class="node infra"><rect x="200" y="340" width="220" height="56" rx="10"/><text x="310" y="366" text-anchor="middle">Service Registry</text><text class="small" x="310" y="384" text-anchor="middle">hiện: file JSON tĩnh</text></g>
+          <g class="node svc"><rect x="560" y="60" width="180" height="56" rx="10"/><text x="650" y="86" text-anchor="middle">auth worker</text><text class="small" x="650" y="104" text-anchor="middle">auth.login, auth.logout…</text></g>
+          <g class="node svc"><rect x="560" y="182" width="180" height="56" rx="10"/><text x="650" y="208" text-anchor="middle">user-service</text><text class="small" x="650" y="226" text-anchor="middle">user.getById…</text></g>
+          <g class="node svc"><rect x="560" y="304" width="180" height="56" rx="10"/><text x="650" y="330" text-anchor="middle">order-service</text><text class="small" x="650" y="348" text-anchor="middle">listOrders…</text></g>
+          <g class="node infra"><rect x="800" y="60" width="140" height="56" rx="10"/><text x="870" y="86" text-anchor="middle">Keycloak</text><text class="small" x="870" y="104" text-anchor="middle">phát + ký token</text></g>
+          <g class="node"><rect x="800" y="244" width="140" height="56" rx="10"/><text x="870" y="277" text-anchor="middle">RabbitMQ</text></g>
+        </svg>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="section-head">
+        <h2>Control plane và data plane</h2>
+        <p>Việc nặng làm một lần lúc khởi động. Mỗi request chỉ tra dữ liệu đã có trong bộ nhớ.</p>
+      </div>
+      <div class="planes" id="planes">
+        <div class="panel plane">
+          <span class="eyebrow">Lúc khởi động · bootstrap.ts</span>
+          <h3>Control plane: chuẩn bị luật</h3>
+          <div class="when">chạy hiếm · ưu tiên đúng · lỗi thì exit 1, không mở cổng</div>
+          <ol>
+            <li>Đọc env, chọn project, chặn path traversal <code>config.ts</code></li>
+            <li>Đọc + validate OpenAPI, ép luật <code>operationId</code> <code>spec-loader.ts</code></li>
+            <li>Dựng segment trie <code>route-table.ts</code></li>
+            <li>Nạp bảng pattern → instance <code>static-discovery.ts</code></li>
+            <li>Cảnh báo pattern chưa ai đăng ký</li>
+          </ol>
+          <div class="rule">Gom <strong>mọi</strong> lỗi rồi báo một lần, để người viết spec sửa một lượt.</div>
+        </div>
+        <div class="panel plane data">
+          <span class="eyebrow">Mỗi request · gateway-handler.ts</span>
+          <h3>Data plane: áp luật cho request</h3>
+          <div class="when">chạy liên tục · ưu tiên nhanh · chỉ đọc bộ nhớ</div>
+          <ol>
+            <li>Lấy hoặc sinh <code>x-request-id</code></li>
+            <li>Match route trong trie, O(số segment)</li>
+            <li>Dựng payload theo allowlist</li>
+            <li>Hỏi discovery: ai xử lý pattern này?</li>
+            <li>Gửi TCP, dịch kết quả và lỗi sang HTTP</li>
+          </ol>
+          <div class="rule">Control plane chết thì data plane vẫn chạy bằng cấu hình đã nạp.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="section-head">
+        <h2>Một request đi qua gateway</h2>
+        <p>Chọn một tình huống để xem request dừng ở bước nào và gateway trả về gì. Bấm vào từng bước để đọc chi tiết.</p>
+      </div>
+      <div class="sim">
+        <div class="panel scenarios" id="scenarios" role="group" aria-label="Tình huống"></div>
+        <div class="panel sim-main">
+          <div class="verdict" id="verdict"></div>
+          <div class="track" id="track"></div>
+          <div class="step-detail">
+            <div id="step-info"></div>
+            <div>
+              <span class="eyebrow">Response</span>
+              <pre class="response" id="response"></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </section>
+
+  <!-- ================= KNOWLEDGE ================= -->
+  <section id="view-knowledge" data-view-panel="knowledge" hidden>
+    <div class="kgrid">
+      <aside class="panel toc" id="toc">
+        <button class="btn toc-toggle" id="toc-toggle" type="button" aria-expanded="false">Danh sách chủ đề</button>
+        <input id="toc-search" type="search" placeholder="Tìm chủ đề…" aria-label="Tìm chủ đề">
+        <ol id="toc-list"></ol>
+      </aside>
+      <article class="topic" id="topic"></article>
+    </div>
+  </section>
+
+  <!-- ================= PRACTICE ================= -->
+  <section id="view-practice" data-view-panel="practice" hidden>
+    <div class="section-head">
+      <h2>Luyện câu hỏi</h2>
+      <p>Nói thành tiếng câu trả lời trước, rồi mới mở ý chính để đối chiếu. Đánh dấu được lưu trong trình duyệt này.</p>
+    </div>
+    <div class="filters" id="filters"></div>
+    <div class="practice-top">
+      <span class="counter" id="counter"></span>
+      <div class="fgroup">
+        <button class="btn" id="shuffle-btn" type="button">Xáo thứ tự</button>
+        <button class="btn" id="reset-btn" type="button">Xoá đánh dấu</button>
+      </div>
+    </div>
+    <div class="panel" id="card"></div>
+    <p class="kbd-help"><kbd>Space</kbd> mở ý chính · <kbd>←</kbd> <kbd>→</kbd> câu trước/sau · <kbd>1</kbd> cần ôn lại · <kbd>2</kbd> đã thuộc</p>
+  </section>
+
+  <!-- ================= GLOSSARY ================= -->
+  <section id="view-glossary" data-view-panel="glossary" hidden>
+    <div class="section-head">
+      <h2>Từ điển nhanh</h2>
+      <p>Thuật ngữ gặp trong dự án và trong phỏng vấn.</p>
+    </div>
+    <input class="gloss-search" id="gloss-search" type="search" placeholder="Tìm thuật ngữ…" aria-label="Tìm thuật ngữ">
+    <div class="gloss" id="gloss"></div>
+  </section>
+
+  <!-- ================= SLIDES ================= -->
+  <section id="view-slides" data-view-panel="slides" hidden>
+    <div class="slide-bar">
+      <span class="counter" id="slide-counter"></span>
+      <div class="fgroup">
+        <button class="btn" id="slide-prev" type="button">← Trước</button>
+        <button class="btn primary" id="slide-next" type="button">Sau →</button>
+        <button class="btn" id="slide-notes-btn" type="button" aria-pressed="false">Ghi chú người nói</button>
+        <button class="btn" id="slide-full" type="button">Toàn màn hình</button>
+      </div>
+    </div>
+    <div class="stage" id="stage">
+      <div class="slide-frame">
+        <div class="slide" id="slide"></div>
+      </div>
+    </div>
+    <div class="slide-progress" aria-hidden="true"><i id="slide-progress"></i></div>
+    <div class="panel slide-notes" id="slide-notes" hidden></div>
+    <p class="kbd-help"><kbd>→</kbd> <kbd>Space</kbd> slide sau · <kbd>←</kbd> slide trước · <kbd>F</kbd> toàn màn hình · <kbd>N</kbd> ghi chú · <kbd>Home</kbd> <kbd>End</kbd> đầu/cuối. Nội dung sửa trong <code>SLIDES.md</code>.</p>
+  </section>
+</main>
+<footer class="wrap" id="footer"></footer>
+
+<script id="data" type="application/json">__KNOWLEDGE_DATA__</script>
+<script>
+(() => {
+  // Mở nhầm file template (chưa có dữ liệu) thì báo rõ thay vì hỏng im lặng.
+  const raw = document.getElementById('data').textContent.trim();
+  if (!raw.startsWith('{')) {
+    document.querySelector('main').innerHTML =
+      '<div class="panel" style="padding:24px;margin-top:24px"><h2>Đây là file template, chưa có dữ liệu</h2>' +
+      '<p>Hãy mở <code>apps/api-gateway/knowledge.html</code> (file đã sinh). ' +
+      'Nếu chưa có, chạy <code>npm exec nx run api-gateway:docs:knowledge</code>.</p></div>';
+    return;
+  }
+  const DATA = JSON.parse(raw);
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const el = (tag, attrs = {}, html) => {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === 'class') node.className = v;
+      else if (k === 'text') node.textContent = v;
+      else node.setAttribute(k, v);
+    }
+    if (html !== undefined) node.innerHTML = html;
+    return node;
+  };
+  const STATUS_LABEL = { done: 'Đã làm', theory: 'Lý thuyết', todo: 'Chưa học' };
+  const LEVEL_LABEL = { basic: 'Cơ bản', mid: 'Trung bình', hard: 'Nâng cao' };
+  const topicByN = new Map(DATA.topics.map((t) => [t.n, t]));
+
+  // ---------- storage (có thể bị chặn: luôn bọc try/catch) ----------
+  const store = {
+    get(key, fallback) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; } },
+    set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* bỏ qua */ } },
+  };
+  let marks = store.get('gw-practice-marks', {});
+
+  // ---------- theme ----------
+  const themeBtn = $('#theme-btn');
+  const THEMES = ['system', 'light', 'dark'];
+  const THEME_LABEL = { system: 'hệ thống', light: 'sáng', dark: 'tối' };
+  let theme = store.get('gw-theme', 'system');
+  function applyTheme() {
+    if (theme === 'system') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', theme);
+    themeBtn.textContent = 'Giao diện: ' + THEME_LABEL[theme];
+  }
+  themeBtn.addEventListener('click', () => {
+    theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+    store.set('gw-theme', theme);
+    applyTheme();
+  });
+  applyTheme();
+
+  const generated = new Date(DATA.generatedAt);
+  $('#gen-date').textContent = 'cập nhật ' + generated.toLocaleDateString('vi-VN');
+  $('#footer').textContent = 'Sinh tự động từ KNOWLEDGE.md và INTERVIEW-QUESTIONS.md lúc ' +
+    generated.toLocaleString('vi-VN') + '. Sửa nội dung trong file markdown rồi chạy lại: npm exec nx run api-gateway:docs:knowledge';
+
+  // ================= OVERVIEW: meter =================
+  function renderMeter() {
+    const counts = { done: 0, theory: 0, todo: 0 };
+    DATA.topics.forEach((t) => counts[t.status]++);
+    const total = DATA.topics.length;
+    const known = DATA.questions.filter((q) => marks[q.id] === 'known').length;
+    const review = DATA.questions.filter((q) => marks[q.id] === 'review').length;
+    const qTotal = DATA.questions.length;
+    const pct = (n, of) => (of ? (n / of) * 100 : 0) + '%';
+    $('#meter').innerHTML = `
+      <span class="eyebrow">Tiến độ</span>
+      <div class="meter-row">
+        <div class="label"><span>Chủ đề</span><b>${counts.done} đã làm · ${counts.theory} lý thuyết · ${counts.todo} chưa học</b></div>
+        <div class="bar"><i class="b-done" style="width:${pct(counts.done, total)}"></i><i class="b-theory" style="width:${pct(counts.theory, total)}"></i></div>
+      </div>
+      <div class="meter-row">
+        <div class="label"><span>Câu hỏi luyện</span><b>${known}/${qTotal} đã thuộc · ${review} cần ôn</b></div>
+        <div class="bar"><i class="b-known" style="width:${pct(known, qTotal)}"></i><i class="b-review" style="width:${pct(review, qTotal)}"></i></div>
+      </div>
+      <div class="legend"><a class="btn" href="#topic-0">Bài giới thiệu 2 phút</a><a class="btn primary" href="#practice">Luyện câu hỏi</a></div>`;
+  }
+
+  // ================= OVERVIEW: simulator =================
+  const STEPS = [
+    { t: 'Nhận HTTP', file: 'create-app.ts · problem.filter.ts', d: 'Fastify đọc body: chỉ nhận JSON, giới hạn kích thước. Lỗi ở đây xảy ra trước khi tới controller, được exception filter đổi sang RFC 9457.', fails: ['413 PAYLOAD_TOO_LARGE', '415 UNSUPPORTED_MEDIA_TYPE', '400 BAD_REQUEST'] },
+    { t: 'Request id', file: 'request-id.ts', d: 'Giữ x-request-id của client nếu hợp lệ (≤128 ký tự, [A-Za-z0-9._-]), ngược lại sinh UUID. Mã này đi vào payload và mọi response, kể cả response lỗi.', fails: [] },
+    { t: 'Match route', file: 'route-table.ts', d: 'Tra segment trie: nhánh tĩnh trước nhánh tham số, có backtrack theo method. Decode tham số sau khi match.', fails: ['404 ROUTE_NOT_FOUND', '405 METHOD_NOT_ALLOWED', '400 INVALID_PATH'] },
+    { t: 'Dựng payload', file: 'gateway-handler.ts · contracts.ts', d: 'GatewayRequest { params, query, body, meta } dựng từ đầu theo allowlist. Header lạ của client không lọt xuống service.', fails: [] },
+    { t: 'Hỏi discovery', file: 'discovery/static-discovery.ts', d: 'Ai xử lý (project, operationId)? Tra theo pattern, không theo tên service. Rỗng nghĩa là chưa service nào đăng ký pattern này.', fails: ['503 NO_INSTANCE'] },
+    { t: 'Chọn instance', file: 'load-balancer.ts · gateway-handler.ts', d: 'Round-robin theo từng project|pattern cho ra thứ tự thử. Instance đầu chưa kết nối được (ECONNREFUSED) thì thử instance kế: an toàn kể cả POST vì service chưa hề nhận request.', fails: ['502 khi mọi instance đều không kết nối được'] },
+    { t: 'Gửi TCP', file: 'transport/tcp-transport.ts', d: 'send(operationId, payload) qua connection pool, có timeout. Lỗi được phân loại: timeout, không kết nối được, không có handler, lỗi từ service.', fails: ['504 UPSTREAM_TIMEOUT', '502 UPSTREAM_UNAVAILABLE', '502 PATTERN_NOT_HANDLED', '502 UPSTREAM_ERROR'] },
+    { t: 'Trả response', file: 'gateway-handler.ts · problem.ts', d: 'Thành công: status lấy từ responses trong spec (201, 204…). Lỗi nghiệp vụ theo hợp đồng: dùng statusCode và code của service.', fails: ['4xx/5xx từ service'] },
+  ];
+  const problem = (status, title, code, detail, instance, rid) => JSON.stringify({ type: 'about:blank', title, status, detail, instance, code, requestId: rid }, null, 2);
+  const SCENARIOS = [
+    { name: 'Thành công', req: 'GET /users/42', stop: null, status: 200,
+      res: `HTTP/1.1 200 OK\ncontent-type: application/json\nx-request-id: demo-trace-1\n\n{\n  "echo": {\n    "params": { "id": "42" },\n    "query": {},\n    "meta": { "requestId": "demo-trace-1",\n              "operationId": "user.getById",\n              "project": "example" }\n  }\n}`,
+      note: 'Status 200 lấy từ responses của operation trong spec.' },
+    { name: 'Tạo mới', req: 'POST /users {"name":"Nam"}', stop: null, status: 201,
+      res: `HTTP/1.1 201 Created\ncontent-type: application/json\n\n{ "echo": { "body": { "name": "Nam" }, ... } }`,
+      note: 'Message RPC không có HTTP status. Spec khai báo 201 nên gateway trả 201.' },
+    { name: 'Không có route', req: 'GET /nope', stop: 2, status: 404,
+      res: 'HTTP/1.1 404 Not Found\ncontent-type: application/problem+json\n\n' + problem(404, 'Not Found', 'ROUTE_NOT_FOUND', 'No route for GET /nope', '/nope', '61a9…'),
+      note: 'Gateway tự trả, không gửi gì xuống service.' },
+    { name: 'Sai method', req: 'PUT /users/42', stop: 2, status: 405,
+      res: 'HTTP/1.1 405 Method Not Allowed\nallow: GET\ncontent-type: application/problem+json\n\n' + problem(405, 'Method Not Allowed', 'METHOD_NOT_ALLOWED', 'PUT is not allowed on /users/42', '/users/42', 'dc7b…'),
+      note: 'Path tồn tại nhưng không có PUT. Header Allow liệt kê method hợp lệ.' },
+    { name: 'Body quá lớn', req: 'POST /users (2 MB)', stop: 0, status: 413,
+      res: 'HTTP/1.1 413 Payload Too Large\ncontent-type: application/problem+json\n\n' + problem(413, 'Payload Too Large', 'PAYLOAD_TOO_LARGE', 'Request body is too large', '/users', '4f5b…'),
+      note: 'Fastify chặn khi đọc body. Vừa là bảo mật, vừa bảo vệ event loop.' },
+    { name: 'Chưa ai xử lý pattern', req: 'POST /auth/logout', stop: 4, status: 503,
+      res: 'HTTP/1.1 503 Service Unavailable\ncontent-type: application/problem+json\n\n' + problem(503, 'Service Unavailable', 'NO_INSTANCE', 'No service instance is available for "auth.logout"', '/auth/logout', '43bd…'),
+      note: 'Spec có route, nhưng chưa service nào đăng ký pattern auth.logout.' },
+    { name: 'Service đang tắt', req: 'GET /users/42', stop: 6, status: 502,
+      res: 'HTTP/1.1 502 Bad Gateway\ncontent-type: application/problem+json\n\n' + problem(502, 'Bad Gateway', 'UPSTREAM_UNAVAILABLE', 'The service is unreachable', '/users/42', '1a07…'),
+      note: 'ECONNREFUSED. Client TCP hỏng bị bỏ khỏi pool để lần sau kết nối lại được.' },
+    { name: 'Service quá chậm', req: 'GET /users/slow', stop: 6, status: 504,
+      res: 'HTTP/1.1 504 Gateway Timeout\ncontent-type: application/problem+json\n\n' + problem(504, 'Gateway Timeout', 'UPSTREAM_TIMEOUT', 'The service did not respond in time', '/users/slow', '1306…'),
+      note: 'Gateway thôi chờ, nhưng service vẫn có thể xử lý xong. Vì vậy thao tác ghi cần Idempotency-Key.' },
+    { name: 'Lỗi nghiệp vụ', req: 'GET /users/missing', stop: null, status: 404,
+      res: 'HTTP/1.1 404 Not Found\ncontent-type: application/problem+json\n\n' + problem(404, 'Not Found', 'USER_NOT_FOUND', 'User missing not found', '/users/missing', 'b1fc…'),
+      note: 'Service ném RpcException({ statusCode: 404, code: "USER_NOT_FOUND" }). Request đi hết đường, gateway dịch lỗi theo hợp đồng.' },
+  ];
+  let scenarioIdx = 0;
+  let stepIdx = 0;
+
+  function codeClass(s) { return 's' + String(s)[0]; }
+  function renderScenarios() {
+    const box = $('#scenarios');
+    box.innerHTML = '';
+    SCENARIOS.forEach((s, i) => {
+      const b = el('button', { type: 'button', 'aria-pressed': String(i === scenarioIdx) });
+      b.innerHTML = `<span class="name">${s.name}<span class="status-code ${codeClass(s.status)}">${s.status}</span></span><span class="req">${s.req}</span>`;
+      b.addEventListener('click', () => {
+        scenarioIdx = i;
+        stepIdx = s.stop ?? STEPS.length - 1;
+        renderScenarios();
+        renderSim();
+      });
+      box.appendChild(b);
+    });
+  }
+  function renderSim() {
+    const s = SCENARIOS[scenarioIdx];
+    const stopAt = s.stop ?? STEPS.length;
+    $('#verdict').innerHTML = `<span class="status-code ${codeClass(s.status)}">${s.status}</span><span>${s.note}</span>`;
+    const track = $('#track');
+    track.innerHTML = '';
+    STEPS.forEach((step, i) => {
+      const state = s.stop === null ? 'passed' : i < stopAt ? 'passed' : i === stopAt ? 'stopped' : 'skipped';
+      const b = el('button', { type: 'button', class: 'step ' + state });
+      if (i === stepIdx) b.setAttribute('aria-current', 'step');
+      b.innerHTML = `<span class="no">${String(i + 1).padStart(2, '0')}</span><span>${step.t}</span>`;
+      b.addEventListener('click', () => { stepIdx = i; renderSim(); });
+      track.appendChild(b);
+    });
+    const step = STEPS[stepIdx];
+    $('#step-info').innerHTML = `
+      <span class="eyebrow">Bước ${stepIdx + 1}</span>
+      <h3>${step.t}</h3>
+      <p>${step.d}</p>
+      <div class="file">${step.file}</div>
+      ${step.fails.length ? `<div class="fails">${step.fails.map((f) => `<span class="status-code ${codeClass(f[0])}">${f}</span>`).join('')}</div>` : ''}`;
+    $('#response').textContent = s.res;
+  }
+
+  // ================= KNOWLEDGE =================
+  const LABELS = [
+    ['Câu hỏi phỏng vấn', 'questions'],
+    ['Bẫy thực tế', 'trap'],
+    ['Bẫy cần nhớ', 'trap'],
+    ['Mẫu trả lời', 'sample'],
+    ['Trong code', 'incode'],
+    ['Tự trả lời', 'self'],
+    ['Tự viết', 'self'],
+  ];
+  function decorate(root) {
+    root.querySelectorAll('table').forEach((t) => {
+      const w = el('div', { class: 'table-wrap' });
+      t.replaceWith(w);
+      w.appendChild(t);
+    });
+    [...root.querySelectorAll(':scope > p')].forEach((p) => {
+      const strong = p.firstElementChild;
+      if (!strong || strong.tagName !== 'STRONG' || p.firstChild !== strong) return;
+      const hit = LABELS.find(([label]) => strong.textContent.startsWith(label));
+      if (!hit) return;
+      const box = el('div', { class: 'callout ' + hit[1] });
+      p.before(box);
+      const next = p.nextElementSibling;
+      box.appendChild(p);
+      if (p.textContent.trim().length > strong.textContent.trim().length + 2) return; // nội dung nằm ngay trong đoạn
+      if (next && /^(UL|OL|BLOCKQUOTE|PRE|DIV)$/.test(next.tagName)) box.appendChild(next);
+    });
+  }
+
+  const questionsByTopic = new Map();
+  DATA.questions.forEach((q) => q.refs.forEach((r) => questionsByTopic.set(r, (questionsByTopic.get(r) ?? 0) + 1)));
+
+  function renderToc(currentN) {
+    const filter = $('#toc-search').value.trim().toLowerCase();
+    const list = $('#toc-list');
+    list.innerHTML = '';
+    DATA.topics
+      .filter((t) => !filter || (t.n + '. ' + t.title).toLowerCase().includes(filter))
+      .forEach((t) => {
+        const li = el('li');
+        const a = el('a', { href: '#topic-' + t.n, title: STATUS_LABEL[t.status] });
+        if (t.n === currentN) a.setAttribute('aria-current', 'true');
+        a.innerHTML = `<span class="num">${String(t.n).padStart(2, '0')}</span><span></span><span class="dot ${t.status}"></span>`;
+        a.children[1].textContent = t.title;
+        li.appendChild(a);
+        list.appendChild(li);
+      });
+  }
+  function renderTopic(n) {
+    const idx = DATA.topics.findIndex((t) => t.n === n);
+    const t = DATA.topics[idx] ?? DATA.topics[0];
+    currentTopic = t.n;
+    const prev = DATA.topics[idx - 1];
+    const next = DATA.topics[idx + 1];
+    const qCount = questionsByTopic.get(t.n) ?? 0;
+    const art = $('#topic');
+    art.innerHTML = `
+      <div class="topic-head">
+        <span class="eyebrow">Chủ đề ${String(t.n).padStart(2, '0')} · Bước PLAN: ${t.step}</span>
+        <h1></h1>
+        <div class="topic-meta"><span class="chip ${t.status}">${STATUS_LABEL[t.status]}</span><span class="status-note"></span></div>
+      </div>
+      <div class="prose" id="prose">${t.html}</div>
+      ${qCount ? `<div class="panel practice-link"><span>Có <b>${qCount}</b> câu hỏi luyện tập liên quan tới chủ đề này.</span><a class="btn primary" href="#practice" data-topic="${t.n}">Luyện ngay</a></div>` : ''}
+      <div class="topic-foot">
+        ${prev ? `<a class="btn" href="#topic-${prev.n}">← ${prev.n}. </a>` : '<span></span>'}
+        ${next ? `<a class="btn" href="#topic-${next.n}">${next.n}. →</a>` : '<span></span>'}
+      </div>`;
+    $('h1', art).textContent = t.title;
+    $('.status-note', art).textContent = t.statusNote;
+    const foot = art.querySelectorAll('.topic-foot a');
+    if (prev) foot[0].textContent = '← ' + prev.n + '. ' + prev.title;
+    if (next) foot[foot.length - 1].textContent = next.n + '. ' + next.title + ' →';
+    decorate($('#prose'));
+    const link = art.querySelector('[data-topic]');
+    if (link) link.addEventListener('click', () => { practiceState.topic = t.n; practiceState.pos = 0; });
+    renderToc(t.n);
+  }
+  let currentTopic = 0;
+  $('#toc-search').addEventListener('input', () => renderToc(currentTopic));
+  $('#toc-toggle').addEventListener('click', () => {
+    const toc = $('#toc');
+    const collapsed = toc.classList.toggle('collapsed');
+    $('#toc-toggle').setAttribute('aria-expanded', String(!collapsed));
+  });
+  if (matchMedia('(max-width: 920px)').matches) $('#toc').classList.add('collapsed');
+
+  // ================= PRACTICE =================
+  const PARTS = [...new Map(DATA.questions.map((q) => [q.part, q.partTitle])).entries()];
+  const practiceState = { part: 'all', level: 'all', onlyReview: false, topic: null, order: DATA.questions.map((_, i) => i), pos: 0, revealed: false };
+
+  function filtered() {
+    return practiceState.order
+      .map((i) => DATA.questions[i])
+      .filter((q) => practiceState.part === 'all' || q.part === practiceState.part)
+      .filter((q) => practiceState.level === 'all' || q.level === practiceState.level)
+      .filter((q) => !practiceState.onlyReview || marks[q.id] !== 'known')
+      .filter((q) => practiceState.topic === null || q.refs.includes(practiceState.topic));
+  }
+  function pillGroup(label, options, key) {
+    const g = el('div', { class: 'fgroup', role: 'group', 'aria-label': label });
+    g.appendChild(el('span', { class: 'eyebrow', text: label }));
+    options.forEach(([value, text]) => {
+      const b = el('button', { type: 'button', class: 'pill', 'aria-pressed': String(practiceState[key] === value) });
+      b.textContent = text;
+      b.addEventListener('click', () => { practiceState[key] = value; practiceState.pos = 0; practiceState.revealed = false; renderPractice(); });
+      g.appendChild(b);
+    });
+    return g;
+  }
+  function renderFilters() {
+    const f = $('#filters');
+    f.innerHTML = '';
+    f.appendChild(pillGroup('Phần', [['all', 'Tất cả'], ...PARTS.map(([id, title]) => [id, id + ' · ' + title])], 'part'));
+    f.appendChild(pillGroup('Mức', [['all', 'Tất cả'], ['basic', 'Cơ bản'], ['mid', 'Trung bình'], ['hard', 'Nâng cao']], 'level'));
+    const extra = el('div', { class: 'fgroup' });
+    const rb = el('button', { type: 'button', class: 'pill', 'aria-pressed': String(practiceState.onlyReview) });
+    rb.textContent = 'Ẩn câu đã thuộc';
+    rb.addEventListener('click', () => { practiceState.onlyReview = !practiceState.onlyReview; practiceState.pos = 0; renderPractice(); });
+    extra.appendChild(rb);
+    if (practiceState.topic !== null) {
+      const t = topicByN.get(practiceState.topic);
+      const tb = el('button', { type: 'button', class: 'pill', 'aria-pressed': 'true', title: 'Bỏ lọc theo chủ đề' });
+      tb.textContent = 'Chủ đề ' + practiceState.topic + (t ? ' · ' + t.title : '') + '  ✕';
+      tb.addEventListener('click', () => { practiceState.topic = null; practiceState.pos = 0; renderPractice(); });
+      extra.appendChild(tb);
+    }
+    f.appendChild(extra);
+  }
+  function setMark(q, value) {
+    if (marks[q.id] === value) delete marks[q.id]; else marks[q.id] = value;
+    store.set('gw-practice-marks', marks);
+  }
+  function renderPractice() {
+    renderFilters();
+    const list = filtered();
+    if (practiceState.pos >= list.length) practiceState.pos = Math.max(0, list.length - 1);
+    const known = DATA.questions.filter((q) => marks[q.id] === 'known').length;
+    $('#counter').textContent = list.length
+      ? `Câu ${practiceState.pos + 1}/${list.length} trong bộ lọc · ${known}/${DATA.questions.length} đã thuộc`
+      : `0 câu trong bộ lọc · ${known}/${DATA.questions.length} đã thuộc`;
+    const card = $('#card');
+    if (!list.length) {
+      card.className = 'panel empty';
+      card.innerHTML = 'Không còn câu nào khớp bộ lọc. Bỏ bớt bộ lọc hoặc tắt "Ẩn câu đã thuộc".';
+      return;
+    }
+    const q = list[practiceState.pos];
+    const mark = marks[q.id];
+    card.className = 'panel card';
+    card.innerHTML = `
+      <div class="card-meta">
+        <span class="eyebrow">Phần ${q.part}${q.group ? ' · ' + q.group : ''}</span>
+        ${q.level ? `<span class="chip ${q.level}">${LEVEL_LABEL[q.level]}</span>` : ''}
+        ${mark ? `<span class="mark ${mark}">${mark === 'known' ? '✓ đã thuộc' : '↺ cần ôn lại'}</span>` : ''}
+      </div>
+      <div class="card-q">${q.text}</div>
+      <div id="hint-area"></div>
+      <div class="card-actions">
+        <button class="btn" id="prev-btn" type="button" ${practiceState.pos === 0 ? 'disabled' : ''}>← Trước</button>
+        <button class="btn primary" id="reveal-btn" type="button">${practiceState.revealed ? 'Ẩn ý chính' : 'Hiện ý chính'}</button>
+        <span class="spacer"></span>
+        <button class="btn again" id="again-btn" type="button">Cần ôn lại</button>
+        <button class="btn good" id="known-btn" type="button">Đã thuộc</button>
+        <button class="btn" id="next-btn" type="button" ${practiceState.pos >= list.length - 1 ? 'disabled' : ''}>Sau →</button>
+      </div>`;
+    if (practiceState.revealed) {
+      const area = $('#hint-area');
+      const refs = q.refs.map((r) => topicByN.get(r)).filter(Boolean);
+      area.innerHTML = `
+        ${q.hint ? `<div class="hint"><span class="eyebrow">${q.hintLabel ?? 'Ý chính'}</span>${q.hint}</div>` : '<div class="hint"><span class="eyebrow">Gợi ý</span>Tự trả lời theo khung: định nghĩa → vì sao / đánh đổi → ví dụ từ dự án.</div>'}
+        ${refs.length ? `<div class="refs"><span class="eyebrow">Đọc lại</span>${refs.map((t) => `<a href="#topic-${t.n}">#${t.n} ${escapeHtml(t.title)}</a>`).join('')}</div>` : ''}`;
+    }
+    $('#prev-btn').addEventListener('click', () => move(-1));
+    $('#next-btn').addEventListener('click', () => move(1));
+    $('#reveal-btn').addEventListener('click', toggleReveal);
+    $('#again-btn').addEventListener('click', () => { setMark(q, 'review'); move(1, true); });
+    $('#known-btn').addEventListener('click', () => { setMark(q, 'known'); move(1, true); });
+  }
+  function move(delta, afterMark) {
+    const list = filtered();
+    const nextPos = practiceState.pos + delta;
+    if (nextPos >= 0 && nextPos < list.length) practiceState.pos = nextPos;
+    practiceState.revealed = false;
+    renderPractice();
+    if (afterMark) renderMeter();
+  }
+  function toggleReveal() { practiceState.revealed = !practiceState.revealed; renderPractice(); }
+  $('#shuffle-btn').addEventListener('click', () => {
+    const o = practiceState.order;
+    for (let i = o.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [o[i], o[j]] = [o[j], o[i]]; }
+    practiceState.pos = 0; practiceState.revealed = false; renderPractice();
+  });
+  const resetBtn = $('#reset-btn');
+  let resetArmed = false;
+  resetBtn.addEventListener('click', () => {
+    if (!resetArmed) { resetArmed = true; resetBtn.textContent = 'Bấm lần nữa để xoá'; setTimeout(() => { resetArmed = false; resetBtn.textContent = 'Xoá đánh dấu'; }, 3000); return; }
+    marks = {}; store.set('gw-practice-marks', marks); resetArmed = false; resetBtn.textContent = 'Xoá đánh dấu';
+    renderPractice(); renderMeter();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (currentView !== 'practice' || e.target.closest('input, textarea')) return;
+    const list = filtered();
+    const q = list[practiceState.pos];
+    if (e.key === ' ') { e.preventDefault(); toggleReveal(); }
+    else if (e.key === 'ArrowRight') move(1);
+    else if (e.key === 'ArrowLeft') move(-1);
+    else if (e.key === '1' && q) { setMark(q, 'review'); move(1, true); }
+    else if (e.key === '2' && q) { setMark(q, 'known'); move(1, true); }
+  });
+
+  // ================= GLOSSARY =================
+  function renderGlossary() {
+    const filter = $('#gloss-search').value.trim().toLowerCase();
+    const box = $('#gloss');
+    box.innerHTML = '';
+    DATA.glossary
+      .filter((g) => !filter || (g.term + ' ' + g.def).toLowerCase().includes(filter))
+      .forEach((g) => box.appendChild(el('div', { class: 'panel term' }, `<b>${g.term}</b><span>${g.def}</span>`)));
+  }
+  $('#gloss-search').addEventListener('input', renderGlossary);
+
+  // ================= SLIDES =================
+  let slideIdx = 0;
+  let showNotes = false;
+  /** Chèn lại sơ đồ của tab Tổng quan vào slide. Đổi id của marker trong SVG để không trùng. */
+  function embed(sourceId, suffix) {
+    const clone = document.getElementById(sourceId).cloneNode(true);
+    clone.removeAttribute('id');
+    clone.querySelectorAll('[id]').forEach((n) => { n.id = n.id + suffix; });
+    clone.querySelectorAll('[marker-start],[marker-end]').forEach((n) => {
+      ['marker-start', 'marker-end'].forEach((attr) => {
+        const v = n.getAttribute(attr);
+        if (v) n.setAttribute(attr, v.replace(/url\(#([^)]+)\)/, `url(#$1${suffix})`));
+      });
+    });
+    return clone;
+  }
+  const EMBEDS = { '{{architecture}}': 'arch-diagram', '{{planes}}': 'planes' };
+  function renderSlide() {
+    const total = DATA.slides.length;
+    slideIdx = Math.max(0, Math.min(slideIdx, total - 1));
+    const s = DATA.slides[slideIdx];
+    const slide = $('#slide');
+    slide.className = 'slide' + (s.cover ? ' cover' : '');
+    slide.innerHTML = s.html +
+      `<span class="slide-brand">API Gateway contract-first</span><span class="slide-no">${String(slideIdx + 1).padStart(2, '0')} / ${String(total).padStart(2, '0')}</span>`;
+    slide.querySelectorAll('p').forEach((p) => {
+      const id = EMBEDS[p.textContent.trim()];
+      if (id) p.replaceWith(embed(id, '-s' + slideIdx));
+    });
+    $('#slide-counter').textContent = `Slide ${slideIdx + 1}/${total}`;
+    $('#slide-progress').style.width = ((slideIdx + 1) / total) * 100 + '%';
+    $('#slide-prev').disabled = slideIdx === 0;
+    $('#slide-next').disabled = slideIdx === total - 1;
+    const notes = $('#slide-notes');
+    notes.hidden = !showNotes;
+    notes.innerHTML = '<span class="eyebrow">Ghi chú người nói</span>' + (s.notes || '<p>Không có ghi chú cho slide này.</p>');
+    $('#slide-notes-btn').setAttribute('aria-pressed', String(showNotes));
+  }
+  function slideGo(i) {
+    slideIdx = i;
+    renderSlide();
+    // Đổi slide không tạo thêm mục trong lịch sử (Back quay về tab trước, không lùi từng slide).
+    try { history.replaceState(null, '', '#slide-' + (slideIdx + 1)); } catch { /* bỏ qua */ }
+  }
+  function toggleFullscreen() {
+    const stage = $('#stage');
+    try {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else stage.requestFullscreen?.().catch(() => undefined);
+    } catch { /* trình xem không hỗ trợ toàn màn hình */ }
+  }
+  $('#slide-prev').addEventListener('click', () => slideGo(slideIdx - 1));
+  $('#slide-next').addEventListener('click', () => slideGo(slideIdx + 1));
+  $('#slide-full').addEventListener('click', toggleFullscreen);
+  $('#slide-notes-btn').addEventListener('click', () => { showNotes = !showNotes; renderSlide(); });
+  document.addEventListener('keydown', (e) => {
+    if (currentView !== 'slides' || e.target.closest('input, textarea') || e.metaKey || e.ctrlKey || e.altKey) return;
+    const last = DATA.slides.length - 1;
+    if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); slideGo(Math.min(slideIdx + 1, last)); }
+    else if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); slideGo(Math.max(slideIdx - 1, 0)); }
+    else if (e.key === 'Home') slideGo(0);
+    else if (e.key === 'End') slideGo(last);
+    else if (e.key === 'f' || e.key === 'F') toggleFullscreen();
+    else if (e.key === 'n' || e.key === 'N') { showNotes = !showNotes; renderSlide(); }
+  });
+
+  function escapeHtml(s) { return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]); }
+
+  // ================= ROUTING (#overview, #knowledge, #topic-N, #practice, #glossary) =================
+  // Không dựa vào sự kiện hashchange để chuyển view: một số trình xem (preview trong IDE, app desktop,
+  // file:// bị chặn điều hướng) không đổi hash khi bấm link. Bấm link nội bộ → gọi go() trực tiếp;
+  // cập nhật URL chỉ là phụ, lỗi thì bỏ qua.
+  let currentView = 'overview';
+  function go(hash, updateUrl = true) {
+    route(hash);
+    if (!updateUrl) return;
+    try {
+      if (location.hash !== '#' + hash) history.pushState(null, '', '#' + hash);
+    } catch { /* trình xem không cho đổi URL: view vẫn đã chuyển */ }
+  }
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('a[href^="#"]');
+    if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    e.preventDefault();
+    go(a.getAttribute('href').slice(1));
+  });
+  function route(hash) {
+    const topicMatch = /^topic-(\d+)$/.exec(hash);
+    const slideMatch = /^slide-(\d+)$/.exec(hash);
+    const view = topicMatch ? 'knowledge'
+      : slideMatch ? 'slides'
+      : ['overview', 'knowledge', 'practice', 'glossary', 'slides'].includes(hash) ? hash : 'overview';
+    currentView = view;
+    document.querySelectorAll('[data-view-panel]').forEach((p) => { p.hidden = p.dataset.viewPanel !== view; });
+    document.querySelectorAll('nav.tabs a').forEach((a) => {
+      if (a.dataset.view === view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+    if (view === 'knowledge') renderTopic(topicMatch ? Number(topicMatch[1]) : DATA.topics[0].n);
+    if (view === 'practice') renderPractice();
+    if (view === 'glossary') renderGlossary();
+    if (view === 'overview') renderMeter();
+    if (view === 'slides') {
+      if (slideMatch) slideIdx = Number(slideMatch[1]) - 1;
+      renderSlide();
+    }
+    window.scrollTo(0, 0);
+  }
+  // Nút Back/Forward của trình duyệt, hoặc người dùng tự sửa hash.
+  const fromUrl = () => route(location.hash.slice(1));
+  window.addEventListener('hashchange', fromUrl);
+  window.addEventListener('popstate', fromUrl);
+
+  renderScenarios();
+  renderSim();
+  fromUrl();
+})();
+</script>
+</body>
+</html>

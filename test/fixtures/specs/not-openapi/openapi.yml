@@ -1,0 +1,3 @@
+# Fixture cho unit test: không phải OpenAPI hợp lệ (thiếu info, paths sai kiểu).
+openapi: 3.0.3
+paths: 42

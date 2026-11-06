@@ -1,0 +1,59 @@
+# Spec ví dụ. Mỗi project tạo một thư mục specs/<project>/openapi.yml rồi chạy gateway với
+#   GATEWAY_PROJECT=<project>
+#
+# Luật của gateway (ngoài luật OpenAPI 3.x):
+#   - Mọi operation BẮT BUỘC có operationId: string tự do, không rỗng, không trùng.
+#   - operationId chính là @MessagePattern trong controller của service (khớp CHÍNH XÁC):
+#       @MessagePattern('user.getById') getById(@Payload() req: GatewayRequest) { ... }
+#   - Spec không ghi service nào xử lý. Mỗi service khai báo các pattern của nó khi đăng ký
+#     vào Service Registry; gateway hỏi registry "ai xử lý pattern này?".
+#   - Mã 2xx nhỏ nhất trong `responses` là HTTP status khi service xử lý thành công.
+#   - security: [] đánh dấu route công khai (không cần token).
+openapi: 3.0.3
+info:
+  title: Example project
+  version: 1.0.0
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+# Mặc định mọi route cần token (an toàn theo mặc định).
+security:
+  - bearer: []
+
+paths:
+  /auth/login:
+    post:
+      operationId: auth.login
+      security: [] # công khai
+      responses:
+        '200': { description: Access + refresh token }
+
+  /auth/logout:
+    post:
+      operationId: auth.logout
+      responses:
+        '204': { description: Logged out }
+
+  /users:
+    get:
+      operationId: user.list
+      responses:
+        '200': { description: List users }
+    post:
+      operationId: user.create
+      responses:
+        '201': { description: Created }
+
+  /users/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: user.getById
+      responses:
+        '200': { description: One user }
+        '404': { description: Not found }
