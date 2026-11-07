@@ -1,4 +1,4 @@
-// Sinh knowledge.html từ KNOWLEDGE.md + INTERVIEW-QUESTIONS.md + SLIDES.md.
+// Sinh knowledge.html từ documents/KNOWLEDGE.md + INTERVIEW-QUESTIONS.md + SLIDES.md.
 // Chạy: npm exec nx run api-gateway:docs:knowledge   (hoặc: node scripts/build-knowledge-html.mjs)
 // Markdown là nguồn chuẩn; HTML chỉ là bản trình bày, KHÔNG sửa tay file sinh ra.
 import { createHash } from 'node:crypto';
@@ -171,9 +171,9 @@ function parseSlides(md) {
     });
 }
 
-const knowledge = parseKnowledge(read('KNOWLEDGE.md'));
-const questions = parseQuestions(read('INTERVIEW-QUESTIONS.md'));
-const slides = parseSlides(read('SLIDES.md'));
+const knowledge = parseKnowledge(read('documents/KNOWLEDGE.md'));
+const questions = parseQuestions(read('documents/INTERVIEW-QUESTIONS.md'));
+const slides = parseSlides(read('documents/SLIDES.md'));
 
 const data = {
   generatedAt: new Date().toISOString(),

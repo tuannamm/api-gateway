@@ -1,6 +1,11 @@
+import { existsSync } from 'node:fs';
 import { Logger } from '@nestjs/common';
 import { createGatewayApp } from './create-app';
 import { buildGateway, loadConfig, type Gateway } from './gateway';
+
+// Chạy local: nạp .env (nếu có) bằng API sẵn của Node, không cần dotenv.
+// Biến đã có trong môi trường (export, Docker) KHÔNG bị ghi đè, nên production vẫn cấu hình bằng env.
+if (existsSync('.env')) process.loadEnvFile('.env');
 
 async function bootstrap(): Promise<void> {
   const logger = new Logger('Gateway');
@@ -9,6 +14,7 @@ async function bootstrap(): Promise<void> {
   let gateway: Gateway;
   try {
     gateway = await buildGateway(loadConfig(), {
+      log: (message) => logger.log(message),
       warn: (message) => logger.warn(message),
       error: (message) => logger.error(message),
     });
@@ -19,6 +25,11 @@ async function bootstrap(): Promise<void> {
 
   const { config, spec, unservedPatterns } = gateway;
   logger.log(`Project "${config.project}": ${spec.title} v${spec.version}, ${spec.routes.length} route(s)`);
+  logger.log(
+    config.discovery.kind === 'registry'
+      ? `Discovery: registry ${config.discovery.url} (poll every ${config.discovery.pollIntervalMs}ms)`
+      : `Discovery: static file ${config.discovery.file}`,
+  );
   if (unservedPatterns.length > 0) {
     logger.warn(`No instance registered for: ${unservedPatterns.join(', ')} (requests will get 503)`);
   }

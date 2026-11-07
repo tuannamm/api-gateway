@@ -250,7 +250,7 @@ Dữ liệu đăng ký (service gửi lên registry):
 - API registry, cơ chế heartbeat/TTL và cách gateway đồng bộ: xem **mục 16 (Kế hoạch Service Registry)**.
 - NestJS không tự liệt kê `@MessagePattern`; `registry-client` tự thu thập bằng `DiscoveryService` + `MetadataScanner` của NestJS.
 - Đánh đổi: gateway **không kiểm tra được lúc khởi động** pattern nào chưa có service xử lý (registry thay đổi liên tục), chỉ biết lúc request (503). Gateway log lại danh sách pattern chưa có ai xử lý mỗi khi snapshot thay đổi.
-- Lộ trình: `StaticDiscovery` (✅ Bước 2) → registry riêng (`apps/service-discovery`) → `RegistryDiscovery` (đồng bộ snapshot). Cả hai cùng implements `ServiceDiscovery`, chọn bằng env.
+- Lộ trình: `StaticDiscovery` (✅ Bước 2) → registry riêng (`apps/service-discovery`, ✅) → `RegistryDiscovery` (✅ Bước 7, `src/gateway/discovery/registry-discovery.ts`). Cả hai cùng implements `ServiceDiscovery`, chọn bằng env: `GATEWAY_REGISTRY_URL` **hoặc** `GATEWAY_DISCOVERY_FILE`.
 - **Định dạng file `GATEWAY_DISCOVERY_FILE`** (cùng hình dạng với dữ liệu đăng ký ở trên; ví dụ: `discovery.local.json`):
   ```json
   { "instances": [
@@ -389,7 +389,7 @@ specs/
 | 1 ✅ | Config theo project + SpecLoader + RouteTable (unit test) | Contract-first, trie routing, fail-fast, path traversal |
 | 2 ✅ | Catch-all handler + `StaticDiscovery` + TCP transport + request id + timeout + body limit + lỗi RFC 9457; `apps/echo-service` (chạy local, Docker ở Bước 6) | Protocol translation, RPC, connection pool, mã lỗi gateway |
 | 3 ✅ | Load balancing (round-robin theo pattern) + failover an toàn (`delivered`) | Round-robin, khi nào retry sang instance khác là an toàn |
-| 7 ⏭️ (làm tiếp theo) | Service Registry + `registry-client` + gateway đồng bộ snapshot (mục 16) | Heartbeat, lease TTL, soft state, snapshot sync, stale-on-error, AP |
+| 7 ✅ | Service Registry + `registry-client` + gateway đồng bộ snapshot (mục 16) | Heartbeat, lease TTL, soft state, snapshot sync, stale-on-error, AP |
 | 4 | Auth (Keycloak JWKS), validate, rate limit, giới hạn an toàn | JWT, JWKS, token bucket, Redis |
 | 5 | Observability + resilience | Log/metrics, retry, circuit breaker, outlier detection |
 | 6 | Đóng gói Docker + README "dùng cho project mới" | Cấu hình bằng env, graceful shutdown |
@@ -421,7 +421,9 @@ src/
 
 ---
 
-## 16. Kế hoạch Service Registry (Bước 7, làm tiếp theo)
+## 16. Kế hoạch Service Registry (Bước 7, ✅ đã làm)
+
+> Đã triển khai. Thiết kế chi tiết, quyết định phát sinh khi code và kết quả chạy thật: `apps/service-discovery/documents/PLAN.md`. Khác plan bên dưới: client là **bản copy** trong `echo-service/src/registry/` (các app là repo riêng), không phải `packages/registry-client`.
 
 **Bối cảnh:** gateway đang đọc instance từ file tĩnh: thêm/bớt instance phải sửa file và restart; instance chết vẫn nằm trong danh sách nên round-robin vẫn chọn nó (hạn chế của Bước 3).
 

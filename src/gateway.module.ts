@@ -24,8 +24,9 @@ export class GatewayModule implements OnApplicationShutdown {
     };
   }
 
-  /** Graceful shutdown: đóng mọi kết nối TCP tới service khi app tắt (SIGTERM, app.close()). */
+  /** Graceful shutdown: dừng poll registry và đóng mọi kết nối TCP tới service (SIGTERM, app.close()). */
   async onApplicationShutdown(): Promise<void> {
+    this.gateway.discovery.close?.();
     await this.gateway.transport.close();
   }
 }

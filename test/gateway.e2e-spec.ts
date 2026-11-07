@@ -47,13 +47,14 @@ describe('Gateway (e2e)', () => {
     });
     const transport = new TcpTransport();
     const config = {
-      project: 'demo', specsDir: '', specPath: '', discoveryFile: '',
+      project: 'demo', specsDir: '', specPath: '', discovery: { kind: 'file' as const, file: '' },
       rpcTimeoutMs: 300, bodyLimit: 1024, failoverMaxAttempts: 3, port: 0,
     };
     const gateway: Gateway = {
       config,
       spec,
       transport,
+      discovery,
       unservedPatterns: [],
       handler: new GatewayHandler({
         project: 'demo',

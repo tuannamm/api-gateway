@@ -3,13 +3,19 @@
 export * from './types';
 export * from './errors';
 export * from './contracts';
-export { loadConfig, listProjects, type GatewayConfig } from './config';
+export { loadConfig, listProjects, type GatewayConfig, type DiscoveryConfig } from './config';
 export { loadSpec, extractRoutes, pickSuccessStatus, type LoadedSpec } from './spec-loader';
 export { RouteTable } from './route-table';
 export { resolveRequestId, REQUEST_ID_HEADER } from './request-id';
 export { GatewayError, toProblem, PROBLEM_CONTENT_TYPE, type ProblemDetails } from './problem';
 export type { Instance, ServiceDiscovery } from './discovery/types';
 export { StaticDiscovery, type StaticInstanceEntry } from './discovery/static-discovery';
+export {
+  RegistryDiscovery,
+  type RegistryDiscoveryOptions,
+  type RegistryDiscoveryLogger,
+  type RefreshResult,
+} from './discovery/registry-discovery';
 export * from './transport/types';
 export { TcpTransport } from './transport/tcp-transport';
 export { RoundRobinBalancer, type LoadBalancer } from './load-balancer';

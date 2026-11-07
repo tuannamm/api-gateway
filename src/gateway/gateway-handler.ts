@@ -37,6 +37,8 @@ export interface OutgoingResponse {
 }
 
 export interface GatewayLogger {
+  /** Thông tin bình thường (VD snapshot discovery đổi). Không bắt buộc. */
+  log?(message: string): void;
   warn(message: string): void;
   error(message: string): void;
 }

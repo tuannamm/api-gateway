@@ -527,7 +527,7 @@ footer { color: var(--muted); font-size: 12.5px; padding-block: 0 32px; }
     </div>
     <div class="slide-progress" aria-hidden="true"><i id="slide-progress"></i></div>
     <div class="panel slide-notes" id="slide-notes" hidden></div>
-    <p class="kbd-help"><kbd>→</kbd> <kbd>Space</kbd> slide sau · <kbd>←</kbd> slide trước · <kbd>F</kbd> toàn màn hình · <kbd>N</kbd> ghi chú · <kbd>Home</kbd> <kbd>End</kbd> đầu/cuối. Nội dung sửa trong <code>SLIDES.md</code>.</p>
+    <p class="kbd-help"><kbd>→</kbd> <kbd>Space</kbd> slide sau · <kbd>←</kbd> slide trước · <kbd>F</kbd> toàn màn hình · <kbd>N</kbd> ghi chú · <kbd>Home</kbd> <kbd>End</kbd> đầu/cuối. Nội dung sửa trong <code>documents/SLIDES.md</code>.</p>
   </section>
 </main>
 <footer class="wrap" id="footer"></footer>
@@ -541,7 +541,7 @@ footer { color: var(--muted); font-size: 12.5px; padding-block: 0 32px; }
     document.querySelector('main').innerHTML =
       '<div class="panel" style="padding:24px;margin-top:24px"><h2>Đây là file template, chưa có dữ liệu</h2>' +
       '<p>Hãy mở <code>apps/api-gateway/knowledge.html</code> (file đã sinh). ' +
-      'Nếu chưa có, chạy <code>npm exec nx run api-gateway:docs:knowledge</code>.</p></div>';
+      'Nếu chưa có, chạy <code>npm run docs:knowledge</code> trong <code>apps/api-gateway</code>.</p></div>';
     return;
   }
   const DATA = JSON.parse(raw);
@@ -586,8 +586,8 @@ footer { color: var(--muted); font-size: 12.5px; padding-block: 0 32px; }
 
   const generated = new Date(DATA.generatedAt);
   $('#gen-date').textContent = 'cập nhật ' + generated.toLocaleDateString('vi-VN');
-  $('#footer').textContent = 'Sinh tự động từ KNOWLEDGE.md và INTERVIEW-QUESTIONS.md lúc ' +
-    generated.toLocaleString('vi-VN') + '. Sửa nội dung trong file markdown rồi chạy lại: npm exec nx run api-gateway:docs:knowledge';
+  $('#footer').textContent = 'Sinh tự động từ documents/KNOWLEDGE.md và documents/INTERVIEW-QUESTIONS.md lúc ' +
+    generated.toLocaleString('vi-VN') + '. Sửa nội dung trong file markdown rồi chạy lại: npm run docs:knowledge';
 
   // ================= OVERVIEW: meter =================
   function renderMeter() {

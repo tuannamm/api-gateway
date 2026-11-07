@@ -3,8 +3,8 @@
 Gateway contract-first: đọc một file OpenAPI, nhận HTTP từ client, dịch thành message RPC
 (`@MessagePattern` = `operationId`) gửi qua TCP tới service đang xử lý pattern đó.
 
-- Thiết kế và quyết định: [PLAN.md](./PLAN.md)
-- Kiến thức ôn phỏng vấn: [KNOWLEDGE.md](./KNOWLEDGE.md)
+- Thiết kế và quyết định: [PLAN.md](./documents/PLAN.md)
+- Kiến thức ôn phỏng vấn: [KNOWLEDGE.md](./documents/KNOWLEDGE.md)
 
 ## Yêu cầu
 
@@ -17,8 +17,10 @@ Gateway contract-first: đọc một file OpenAPI, nhận HTTP từ client, dị
 npm exec nx run echo-service:start:dev
 
 # Terminal 2: gateway (HTTP :3000) cho project "example"
-GATEWAY_PROJECT=example GATEWAY_DISCOVERY_FILE=discovery.local.json \
-  npm exec nx run api-gateway:start:dev
+cp .env.example .env        # lần đầu; gateway tự nạp .env khi khởi động
+npm run start:dev
+# hoặc truyền thẳng (biến dòng lệnh thắng .env):
+# GATEWAY_PROJECT=example GATEWAY_DISCOVERY_FILE=discovery.local.json npm run start:dev
 
 # Terminal 3
 curl -i localhost:3000/users/42
@@ -53,7 +55,9 @@ curl -i -X POST localhost:3000/auth/logout           # 503 NO_INSTANCE
 | Biến | Bắt buộc | Mặc định | Ý nghĩa |
 |---|---|---|---|
 | `GATEWAY_PROJECT` | Có | - | Project cần phục vụ (`specs/<project>/openapi.yml`) |
-| `GATEWAY_DISCOVERY_FILE` | Có | - | File JSON của StaticDiscovery |
+| `GATEWAY_REGISTRY_URL` | Một trong hai | - | Service Registry (VD `http://localhost:8500`); gateway poll snapshot nền |
+| `GATEWAY_DISCOVERY_FILE` | Một trong hai | - | File JSON của StaticDiscovery (không cần registry) |
+| `GATEWAY_REGISTRY_POLL_MS` | Không | `3000` | Chu kỳ poll registry (tối đa 60000) |
 | `GATEWAY_SPECS_DIR` | Không | `./specs` | Thư mục chứa spec |
 | `GATEWAY_SPEC_FILE` | Không | `openapi.yml` | Tên file spec |
 | `GATEWAY_RPC_TIMEOUT_MS` | Không | `10000` | Timeout chờ service (504) |
@@ -66,7 +70,7 @@ curl -i -X POST localhost:3000/auth/logout           # 503 NO_INSTANCE
 1. Tạo `specs/<project>/openapi.yml`. Mọi operation phải có `operationId` không rỗng, không trùng.
 2. Service xử lý bằng `@MessagePattern('<operationId>')`, nhận `GatewayRequest`
    (hợp đồng: `src/gateway/contracts.ts`).
-3. Khai báo instance và pattern trong file discovery (sau này service tự đăng ký vào registry).
+3. Service tự đăng ký vào registry (`REGISTRY_URL`, xem `apps/service-discovery/README.md`), hoặc khai báo tay trong file discovery khi chạy không có registry.
 
 ## Test
 

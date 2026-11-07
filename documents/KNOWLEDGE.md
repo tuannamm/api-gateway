@@ -2,7 +2,7 @@
 
 > File theo dõi kiến thức để ôn phỏng vấn. Cập nhật sau mỗi bước trong [PLAN.md](./PLAN.md).
 > Luyện trả lời: [INTERVIEW-QUESTIONS.md](./INTERVIEW-QUESTIONS.md) (ngân hàng câu hỏi, có ý chính để tự đối chiếu).
-> Bản trực quan: mở `knowledge.html` trong trình duyệt. Sau khi sửa file markdown, chạy `npm exec nx run api-gateway:docs:knowledge` để sinh lại.
+> Bản trực quan: mở `knowledge.html` trong trình duyệt. Sau khi sửa file markdown, chạy `npm run docs:knowledge` (trong `apps/api-gateway`) để sinh lại.
 > Quy ước trạng thái: ✅ đã học và đã làm · 📖 đã học lý thuyết, chưa code · ⬜ chưa học
 
 ## Cách dùng file này
@@ -24,8 +24,8 @@
 | 4 | Routing: segment trie / radix tree | 1 | ✅ |
 | 5 | Fail-fast và validate cấu hình | 1 | ✅ |
 | 6 | Protocol translation (HTTP → RPC) và reverse proxy | 2 | ✅ |
-| 7 | Service discovery | 2, 7 | ✅ phía client (StaticDiscovery); registry ở Bước 7 |
-| 8 | Caching, TTL, stale-on-error | 7 | 📖 (đã chọn: đồng bộ snapshot) |
+| 7 | Service discovery | 2, 7 | ✅ (StaticDiscovery + RegistryDiscovery) |
+| 8 | Caching, TTL, stale-on-error | 7 | ✅ đồng bộ snapshot + ETag |
 | 9 | Load balancing | 3 | ✅ round-robin + failover |
 | 10 | Authentication / Authorization | 4 | ⬜ |
 | 11 | Rate limiting | 4 | ⬜ |
@@ -33,7 +33,7 @@
 | 13 | Observability | 5 | ⬜ |
 | 14 | Resilience: timeout, retry, circuit breaker | 3, 5 | 📖 (timeout + failover an toàn: ✅) |
 | 15 | Đóng gói và triển khai | 6 | ⬜ |
-| 16 | Service registry (heartbeat, TTL, CAP) | 7 | 📖 (đã có thiết kế, làm tiếp theo) |
+| 16 | Service registry (heartbeat, TTL, CAP) | 7 | ✅ (chi tiết: knowledge của service-discovery) |
 | 17 | Gateway trade-offs và so sánh sản phẩm | tổng kết | 📖 |
 | 18 | Mẫu kiến trúc quanh gateway (BFF, aggregation, Strangler Fig) | - | 📖 |
 | 19 | Nền tảng HTTP cho gateway | 2 | ✅ |
@@ -45,6 +45,7 @@
 | 25 | Chiến lược test | 1, 2 | ✅ |
 | 26 | Nguyên lý thiết kế đã dùng trong code | 1, 2 | ✅ |
 | 27 | Idempotency và `Idempotency-Key` | 2 | ✅ phía gateway (chuyển mã); 📖 phía service |
+| 28 | Đường đi của response: service → gateway → client | 2, 3 | ✅ |
 
 ---
 
@@ -300,7 +301,7 @@ interface ServiceDiscovery {
 - Nhược: gateway không kiểm tra được lúc khởi động pattern nào chưa có ai xử lý (chỉ biết lúc request → 503); registry phải chặn **hai service cùng giữ một pattern**.
 - Đây chính là ý tưởng **capability-based discovery**: tìm theo "khả năng" (xử lý được gì), không theo "tên".
 
-Ban đầu dùng `StaticDiscovery`, sau thay bằng `HttpRegistryAdapter` mà không sửa gateway. Đây là **Dependency Inversion** / Adapter pattern.
+Ban đầu dùng `StaticDiscovery`, sau thêm `RegistryDiscovery` mà **không sửa một dòng `GatewayHandler`**. Đây là **Dependency Inversion** / Adapter pattern.
 
 **Phía gateway cần có:** dữ liệu instance trong RAM (không gọi registry mỗi request) và stale-on-error (registry chết thì dùng bản cũ). Dự án chọn **đồng bộ snapshot nền** (xem #8) thay vì cache theo từng pattern.
 
@@ -946,6 +947,136 @@ Lần 2: POST /orders  Idempotency-Key: a1b2c3 → đã có a1b2c3 → trả l�
 
 ---
 
+## 28. Đường đi của response: service → gateway → client
+
+**Tóm tắt:** Response đi ngược qua 4 tầng, mỗi tầng làm đúng một việc. **Transport phân loại lỗi, handler dịch sang HTTP, controller chỉ ghi ra.** Đổi TCP sang RabbitMQ/gRPC thì chỉ thay tầng 2.
+
+```
+Service (@MessagePattern)
+   │  return value   |   throw RpcException({...})
+   ▼
+[1] Dây TCP (NestJS)          gói JSON { id, response | err, isDisposed }
+   ▼
+[2] TcpTransport.send()       trả kết quả, hoặc ném 1 trong 4 lỗi Rpc*        (phân loại)
+   ▼
+[3] GatewayHandler.handle()   failover? → OutgoingResponse { status, headers, body }  (dịch sang HTTP)
+   ▼
+[4] GatewayController.proxy() reply.status().headers().send(JSON.stringify(body))     (ghi ra)
+```
+
+### Tầng 1: service trả lời qua TCP
+
+Service chỉ có hai cách kết thúc handler:
+
+| Service làm | NestJS gửi về gateway |
+|---|---|
+| `return value` | `{ id, response: value, isDisposed: true }` |
+| `throw new RpcException({...})` | `{ id, err: {...}, isDisposed: true }` |
+| Không có `@MessagePattern` khớp | `{ id, err: "There is no matching message handler defined in the remote service." }` |
+
+- **`id`** do `ClientProxy` của gateway gắn lúc gửi. Nhờ `id`, nhiều request chạy **song song trên cùng một socket** mà client vẫn biết response nào của request nào (multiplexing). Đó là lý do gateway chỉ cần **một socket cho mỗi `host:port`** (connection pool).
+- Mọi thứ đi qua dây là **JSON**: lỗi về tới gateway là **object thường**, không còn là `Error`, không dùng `instanceof` được.
+
+### Tầng 2: `TcpTransport` nhận và phân loại
+
+```ts
+return await firstValueFrom(client.send(pattern, payload).pipe(timeout(timeoutMs)), {
+  defaultValue: undefined,
+});
+```
+
+- `client.send()` trả **Observable**, emit `response` khi gói có `id` khớp quay về.
+- `timeout(timeoutMs)` bao **cả thời gian kết nối lẫn thời gian chờ trả lời**.
+- `defaultValue: undefined`: handler trả `undefined` thì Observable kết thúc không emit; thiếu dòng này `firstValueFrom` ném `EmptyError`.
+
+**Thành công:** trả nguyên `response`, không bọc gì. **Thất bại:** phân loại thành 4 loại (chưa nghĩ tới HTTP):
+
+| Lỗi | Khi nào | Nhận biết bằng |
+|---|---|---|
+| `RpcTimeoutError` | Quá `timeoutMs` chưa có response | `TimeoutError` của rxjs |
+| `RpcConnectionError` | Không kết nối được / mất kết nối | `error.code` (`ECONNREFUSED`, `ECONNRESET`...) hoặc `"Connection closed"` |
+| `RpcPatternNotHandledError` | Service sống nhưng không có handler cho pattern | `err` đúng bằng chuỗi `NO_MESSAGE_HANDLER` |
+| `RpcRemoteError` | Service ném `RpcException` | Còn lại; giữ nguyên `payload` |
+
+- `RpcConnectionError.delivered`: `false` = **chắc chắn chưa tới** service (an toàn để failover); `true` = **có thể đã xử lý**.
+- Lỗi kết nối → **evict** client khỏi pool (vì `ClientTCP` cache cả promise kết nối thất bại).
+
+### Tầng 3: `GatewayHandler` dịch sang HTTP
+
+**Failover trước** (`sendWithFailover`): chỉ thử instance kế khi `RpcConnectionError` và `delivered === false`. Mọi lỗi khác ném ngay (xem mục 14).
+
+**Thành công:**
+- Status lấy **từ spec** (`route.successStatus`), không từ service, vì message RPC không có HTTP status.
+- `204` → không body. Còn lại → `body = result ?? null`, `content-type: application/json`.
+- Luôn kèm header request-id.
+
+**Thất bại:** `toGatewayError` là **chỗ duy nhất** quyết định mã HTTP:
+
+| Lỗi | HTTP | `code` |
+|---|---|---|
+| `RpcTimeoutError` | 504 | `UPSTREAM_TIMEOUT` |
+| `RpcConnectionError` | 502 | `UPSTREAM_UNAVAILABLE` |
+| `RpcPatternNotHandledError` | 502 | `PATTERN_NOT_HANDLED` |
+| `RpcRemoteError` **đúng hợp đồng** | `statusCode` service đưa | `code` service đưa (mặc định `UPSTREAM_ERROR`) |
+| `RpcRemoteError` sai hợp đồng | 502 | `UPSTREAM_ERROR` (chỉ log chi tiết) |
+| Lỗi của chính gateway | 500 | `INTERNAL_ERROR` (không lộ chi tiết) |
+
+"Đúng hợp đồng" = payload khớp `GatewayRpcError` (`contracts.ts`), kiểm bằng `asRemoteError`: `statusCode` là số nguyên **400–599**, `message`/`code` là chuỗi. Service vì vậy **tự chọn được mã lỗi nghiệp vụ** (404, 409...), còn lỡ ném `Error` thường thì client chỉ thấy 502.
+
+Mọi lỗi đi qua `toProblem()` thành **RFC 9457** `application/problem+json`:
+
+```json
+{
+  "type": "about:blank",
+  "title": "Not Found",
+  "status": 404,
+  "detail": "User missing not found",
+  "instance": "/users/missing",
+  "code": "USER_NOT_FOUND",
+  "requestId": "..."
+}
+```
+
+### Tầng 4: controller ghi ra
+
+`GatewayController.proxy()` chỉ `reply.status(...).headers(...)` rồi `send(JSON.stringify(body))`. Tự `stringify` để body `null` vẫn ra chuỗi `"null"` hợp lệ thay vì rỗng; `body === undefined` (204) thì `send()` không body.
+
+### Ví dụ chạy thật với echo-service
+
+| Request | Service làm gì | Client nhận |
+|---|---|---|
+| `GET /users/42` | `return { echo: req }` | **200** (từ spec) + `{ "echo": ... }` |
+| `GET /users/missing` | `throw RpcException({ statusCode: 404, code: 'USER_NOT_FOUND' })` | **404** problem+json |
+| `GET /users/slow` | ngủ 12s > timeout 10s | **504** `UPSTREAM_TIMEOUT` |
+| `auth.logout` | không ai đăng ký pattern | **503** `NO_INSTANCE` (lỗi **trước** khi gửi, không qua đường response) |
+| echo tắt | `ECONNREFUSED` | failover sang instance khác; hết instance → **502** |
+
+**Câu hỏi phỏng vấn**
+- Nhiều request dùng chung một socket TCP, làm sao gateway biết response nào thuộc request nào?
+- Vì sao lỗi service ném ra về tới gateway không còn là `Error`? Gateway phân loại lỗi bằng gì?
+- Message RPC không có HTTP status, vậy status thành công và status lỗi đến từ đâu?
+- Vì sao tách "phân loại lỗi" (transport) khỏi "chọn mã HTTP" (handler)?
+- Service ném `Error` thường thay vì `RpcException` theo hợp đồng thì client thấy gì? Vì sao không trả nguyên message?
+- 502, 503, 504 trong dự án này mỗi mã ứng với tình huống nào?
+
+**Trong code:**
+- `src/gateway/transport/tcp-transport.ts`: `send()` nhận response, phân loại lỗi, evict client hỏng.
+- `src/gateway/transport/types.ts`: 4 lớp lỗi `Rpc*`, cờ `delivered`.
+- `src/gateway/gateway-handler.ts`: `sendWithFailover`, nhánh thành công (dòng "5. Thành công"), `toGatewayError`, `asRemoteError`.
+- `src/gateway/problem.ts`: `GatewayError`, `toProblem` (RFC 9457).
+- `src/gateway.controller.ts`: ghi `OutgoingResponse` ra Fastify.
+- `src/gateway/contracts.ts`: `GatewayRpcError`, hợp đồng lỗi service phải theo.
+
+**Bẫy thực tế:** xem thêm mục 6 (lỗi mất kiểu qua JSON, client TCP cache kết nối hỏng, `EmptyError` khi handler trả `undefined`).
+
+**Mẫu trả lời ngắn:**
+> Service trả lời qua TCP bằng gói JSON có `id` khớp với request, nên nhiều request dùng chung một socket được. Ở gateway, transport chỉ làm một việc: trả kết quả, hoặc phân loại lỗi thành timeout, mất kết nối, không có handler, hay lỗi từ service. Handler mới là nơi duy nhất dịch sang HTTP: thành công thì status lấy từ spec, lỗi nghiệp vụ theo hợp đồng thì dùng `statusCode` của service, còn lại là 502/504, và mọi lỗi đều ra `problem+json`. Tách như vậy để đổi transport không phải sửa logic HTTP.
+
+**Tự trả lời:**
+> _(viết bằng lời của bạn)_
+
+---
+
 ## Từ điển nhanh
 
 | Thuật ngữ | Nghĩa ngắn |
@@ -965,6 +1096,8 @@ Lần 2: POST /orders  Idempotency-Key: a1b2c3 → đã có a1b2c3 → trả l�
 | Capability-based discovery | Tìm service theo việc nó làm được (pattern), không theo tên |
 | RFC 9457 | Chuẩn body lỗi `application/problem+json` (type, title, status, detail, instance) |
 | Connection pool | Giữ và tái sử dụng kết nối thay vì mở mới mỗi request |
+| Correlation id (`id` trong gói TCP) | Mã ghép response với đúng request khi nhiều request chạy chung một socket |
+| Multiplexing | Nhiều request/response đan xen trên cùng một kết nối |
 | BFF | Backend for Frontend: gateway riêng cho từng loại client |
 | Outbox pattern | Ghi dữ liệu và event cần gửi trong cùng transaction rồi publish sau |
 | Saga | Giao dịch nhiều service, mỗi bước có hành động bù |
@@ -980,3 +1113,5 @@ Lần 2: POST /orders  Idempotency-Key: a1b2c3 → đã có a1b2c3 → trả l�
 | 2026-11-06 | Bước 2: catch-all + StaticDiscovery + TcpTransport + RFC 9457 + echo-service; chạy thật end-to-end | Lỗi qua TCP mất kiểu, phải phân loại theo hình dạng; client TCP hỏng phải bỏ khỏi pool; NestJS ghi đè error handler của Fastify | |
 | 2026-11-06 | Bước 3: round-robin theo pattern + failover khi chưa gửi được; chạy thật với 2 echo | Failover chỉ an toàn khi chắc chắn chưa gửi; round-robin cần health check mới tránh được instance chết | |
 | 2026-11-06 | Thiết kế Service Registry (chưa code); bàn DDD vs hexagonal | Heartbeat = đăng ký lại (soft state); snapshot + ETag thay cho cache theo request; "không phụ thuộc framework" khác "đa ngôn ngữ" | |
+| 2026-11-06 | Đọc lại đường đi của response từ service về gateway (mục 28) | Transport phân loại, handler dịch sang HTTP; `id` trong gói TCP cho phép dùng chung socket; status thành công lấy từ spec | |
+| 2026-11-06 | Bước 7: Service Registry + client trong echo-service + `RegistryDiscovery`; chạy thật 6 kịch bản | Poll `setTimeout` nối tiếp + ETag; stale-on-error; khởi động khi registry chết vẫn mở cổng (fail-fast chỉ cho lỗi cấu hình). Chi tiết: `apps/service-discovery/knowledge.html` | |

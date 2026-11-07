@@ -26,7 +26,7 @@ describe('loadConfig', () => {
       APP_ROOT,
     );
     expect(config.specPath).toBe(path.join(APP_ROOT, 'specs', 'example', 'openapi.yml'));
-    expect(config.discoveryFile).toBe(path.join(APP_ROOT, 'discovery.local.json'));
+    expect(config.discovery).toEqual({ kind: 'file', file: path.join(APP_ROOT, 'discovery.local.json') });
   });
 
   it('applies defaults for timeout, body limit and port', () => {
@@ -67,13 +67,48 @@ describe('loadConfig', () => {
     );
   });
 
-  it('requires GATEWAY_DISCOVERY_FILE and checks that it exists', () => {
-    expect(() => loadConfig(env({ GATEWAY_PROJECT: 'demo', GATEWAY_DISCOVERY_FILE: '' }))).toThrow(
-      /GATEWAY_DISCOVERY_FILE is required/,
-    );
+  it('checks that GATEWAY_DISCOVERY_FILE exists', () => {
     expect(() =>
       loadConfig(env({ GATEWAY_PROJECT: 'demo', GATEWAY_DISCOVERY_FILE: '/nope/discovery.json' })),
     ).toThrow(/Discovery file not found/);
+  });
+
+  describe('discovery source', () => {
+    const noFile = { GATEWAY_DISCOVERY_FILE: undefined };
+
+    it('requires exactly one of GATEWAY_DISCOVERY_FILE or GATEWAY_REGISTRY_URL', () => {
+      expect(() => loadConfig(env({ GATEWAY_PROJECT: 'demo', GATEWAY_DISCOVERY_FILE: '' }))).toThrow(
+        /Set GATEWAY_REGISTRY_URL .* or GATEWAY_DISCOVERY_FILE/,
+      );
+      expect(() =>
+        loadConfig(env({ GATEWAY_PROJECT: 'demo', GATEWAY_REGISTRY_URL: 'http://localhost:8500' })),
+      ).toThrow(/Set only one of/);
+    });
+
+    it('uses the registry with a default poll interval of 3s', () => {
+      const config = loadConfig(
+        env({ ...noFile, GATEWAY_PROJECT: 'demo', GATEWAY_REGISTRY_URL: 'http://localhost:8500/' }),
+      );
+      expect(config.discovery).toEqual({ kind: 'registry', url: 'http://localhost:8500', pollIntervalMs: 3_000 });
+    });
+
+    it('reads GATEWAY_REGISTRY_POLL_MS (max 60s)', () => {
+      const base = { ...noFile, GATEWAY_PROJECT: 'demo', GATEWAY_REGISTRY_URL: 'http://registry:8500' };
+      expect(loadConfig(env({ ...base, GATEWAY_REGISTRY_POLL_MS: '1000' })).discovery).toMatchObject({
+        pollIntervalMs: 1_000,
+      });
+      expect(() => loadConfig(env({ ...base, GATEWAY_REGISTRY_POLL_MS: '60001' }))).toThrow(
+        /GATEWAY_REGISTRY_POLL_MS must be an integer/,
+      );
+    });
+
+    it.each([
+      ['not a url', /not a valid URL/],
+      ['ftp://registry:8500', /must use http or https/],
+      ['http://registry:8500?x=1', /must not contain a query/],
+    ])('rejects GATEWAY_REGISTRY_URL=%p', (url, message) => {
+      expect(() => loadConfig(env({ ...noFile, GATEWAY_PROJECT: 'demo', GATEWAY_REGISTRY_URL: url }))).toThrow(message);
+    });
   });
 
   it('requires GATEWAY_PROJECT and lists the available projects', () => {
