@@ -14,7 +14,7 @@ export interface LoadBalancer {
  *
  *   instances [A, B, C]   lần 1 → [A, B, C]   lần 2 → [B, C, A]   lần 3 → [C, A, B]
  *
- * - Bộ đếm RIÊNG cho từng key (project|pattern). Một bộ đếm chung cho mọi pattern
+ * - Bộ đếm RIÊNG cho từng key (pattern). Một bộ đếm chung cho mọi pattern
  *   làm phân phối của từng pattern bị lệch: nếu request xen kẽ "user.getById" và
  *   "user.list" với 2 instance, mỗi pattern sẽ luôn rơi vào cùng một instance.
  * - Sắp theo id trước khi xoay, để thứ tự không phụ thuộc thứ tự registry trả về.

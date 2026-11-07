@@ -25,7 +25,7 @@ type Behaviour = (pattern: string, payload: GatewayRequest, instance: Instance) 
 
 /** Discovery giả: mọi pattern đều có các instance cho trước, trừ "orphan.list". */
 function fakeDiscovery(instances: Instance[]): ServiceDiscovery {
-  return { resolve: async (_project, pattern) => (pattern === 'orphan.list' ? [] : [...instances]) };
+  return { resolve: async (pattern) => (pattern === 'orphan.list' ? [] : [...instances]) };
 }
 
 /** Transport giả: ghi lại lần gọi, trả kết quả hoặc ném lỗi tuỳ test. */

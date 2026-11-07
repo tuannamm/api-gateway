@@ -1,6 +1,5 @@
 import type { GatewayConfig } from './config';
 import { RegistryDiscovery } from './discovery/registry-discovery';
-import { StaticDiscovery } from './discovery/static-discovery';
 import type { ServiceDiscovery } from './discovery/types';
 import { GatewayHandler, type GatewayLogger } from './gateway-handler';
 import { RoundRobinBalancer } from './load-balancer';
@@ -34,28 +33,18 @@ export async function buildGateway(config: GatewayConfig, logger?: GatewayLogger
     return specPatterns.filter((id) => !set.has(id));
   };
 
-  let discovery: ServiceDiscovery;
-  let served: string[];
-  if (config.discovery.kind === 'registry') {
-    const registry = new RegistryDiscovery({
-      registryUrl: config.discovery.url,
-      project: config.project,
-      pollIntervalMs: config.discovery.pollIntervalMs,
-      logger,
-    });
-    await registry.start();
-    served = registry.patterns();
-    // Registry thay đổi liên tục: mỗi lần bảng đổi, nhắc lại pattern nào đang không có ai xử lý.
-    registry.onChange((patterns) => {
-      const missing = unserved(patterns);
-      if (missing.length) logger?.warn(`No instance registered for: ${missing.join(', ')} (requests will get 503)`);
-    });
-    discovery = registry;
-  } else {
-    const fromFile = StaticDiscovery.fromFile(config.discovery.file);
-    served = fromFile.patterns(config.project);
-    discovery = fromFile;
-  }
+  const discovery = new RegistryDiscovery({
+    registryUrl: config.discovery.url,
+    pollIntervalMs: config.discovery.pollIntervalMs,
+    logger,
+  });
+  await discovery.start();
+  const served = discovery.patterns();
+  // Registry thay đổi liên tục: mỗi lần bảng đổi, nhắc lại pattern nào đang không có ai xử lý.
+  discovery.onChange((patterns) => {
+    const missing = unserved(patterns);
+    if (missing.length) logger?.warn(`No instance registered for: ${missing.join(', ')} (requests will get 503)`);
+  });
 
   const handler = new GatewayHandler({
     project: config.project,

@@ -7,9 +7,10 @@ import {
   loadSpec,
   RoundRobinBalancer,
   RouteTable,
-  StaticDiscovery,
   TcpTransport,
   type Gateway,
+  type Instance,
+  type ServiceDiscovery,
 } from '../src/gateway';
 import { getFreePort, startEchoFixture } from './support/echo-fixture';
 
@@ -27,27 +28,23 @@ describe('Gateway (e2e)', () => {
     echo = await startEchoFixture(echoPort);
 
     const spec = await loadSpec(path.join(__dirname, 'fixtures/specs/demo/openapi.yml'));
-    const discovery = StaticDiscovery.fromEntries({
-      instances: [
-        {
-          project: 'demo', service: 'echo', id: 'echo-1', host: '127.0.0.1', port: echoPort,
-          patterns: ['user.getById', 'user.create', 'user.remove', 'user.list', 'user.getMe'],
-        },
-        {
-          // Instance đã chết của cùng service: round-robin sẽ chọn nó mỗi lượt thứ hai, failover phải cứu.
-          project: 'demo', service: 'echo', id: 'echo-2-dead', host: '127.0.0.1', port: deadPort,
-          patterns: ['user.getById', 'user.create', 'user.remove', 'user.list', 'user.getMe'],
-        },
-        {
-          project: 'demo', service: 'order', id: 'order-1', host: '127.0.0.1', port: deadPort,
-          patterns: ['listOrdersOfUser'],
-        },
-        // "auth.login" cố ý không ai đăng ký → 503
-      ],
-    });
+    // Discovery giả trong bộ nhớ (thay cho RegistryDiscovery): e2e kiểm tra HTTP → TCP, không kiểm tra registry.
+    const echoPatterns = ['user.getById', 'user.create', 'user.remove', 'user.list', 'user.getMe'];
+    const echo1: Instance = { service: 'echo', id: 'echo-1', host: '127.0.0.1', port: echoPort };
+    // Instance đã chết của cùng service: round-robin sẽ chọn nó mỗi lượt thứ hai, failover phải cứu.
+    const echo2Dead: Instance = { service: 'echo', id: 'echo-2-dead', host: '127.0.0.1', port: deadPort };
+    const order1: Instance = { service: 'order', id: 'order-1', host: '127.0.0.1', port: deadPort };
+    const table = new Map<string, Instance[]>([
+      ...echoPatterns.map((p): [string, Instance[]] => [p, [echo1, echo2Dead]]),
+      ['listOrdersOfUser', [order1]],
+      // "auth.login" cố ý không ai đăng ký → 503
+    ]);
+    const discovery: ServiceDiscovery = {
+      resolve: async (pattern) => [...(table.get(pattern) ?? [])],
+    };
     const transport = new TcpTransport();
     const config = {
-      project: 'demo', specsDir: '', specPath: '', discovery: { kind: 'file' as const, file: '' },
+      project: 'demo', specsDir: '', specPath: '', discovery: { url: 'http://registry.invalid', pollIntervalMs: 3_000 },
       rpcTimeoutMs: 300, bodyLimit: 1024, failoverMaxAttempts: 3, port: 0,
     };
     const gateway: Gateway = {

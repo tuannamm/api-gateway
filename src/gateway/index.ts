@@ -9,7 +9,6 @@ export { RouteTable } from './route-table';
 export { resolveRequestId, REQUEST_ID_HEADER } from './request-id';
 export { GatewayError, toProblem, PROBLEM_CONTENT_TYPE, type ProblemDetails } from './problem';
 export type { Instance, ServiceDiscovery } from './discovery/types';
-export { StaticDiscovery, type StaticInstanceEntry } from './discovery/static-discovery';
 export {
   RegistryDiscovery,
   type RegistryDiscoveryOptions,

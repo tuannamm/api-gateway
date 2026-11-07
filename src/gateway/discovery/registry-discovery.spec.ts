@@ -15,7 +15,7 @@ function fakeFetch(...responses: Array<Response | Error>) {
 }
 
 const snapshot = (version: number, instances: unknown[], etag = `"boot-${version}"`) =>
-  new Response(JSON.stringify({ project: 'example', version, instances }), {
+  new Response(JSON.stringify({ version, instances }), {
     status: 200,
     headers: { 'content-type': 'application/json', etag },
   });
@@ -28,7 +28,6 @@ function create(fetchFn: typeof fetch) {
   const logger = { log: jest.fn(), warn: jest.fn() };
   const discovery = new RegistryDiscovery({
     registryUrl: 'http://registry:8500/',
-    project: 'example',
     pollIntervalMs: 3_000,
     fetch: fetchFn,
     logger,
@@ -45,13 +44,12 @@ describe('RegistryDiscovery', () => {
 
     expect(await discovery.refresh()).toBe('changed');
 
-    expect(calls[0].url).toBe('http://registry:8500/v1/projects/example/snapshot');
-    expect((await discovery.resolve('example', 'user.getById')).map((i) => i.id)).toEqual(['echo-1', 'echo-2']);
-    expect(await discovery.resolve('example', 'user.list')).toEqual([
+    expect(calls[0].url).toBe('http://registry:8500/v1/snapshot');
+    expect((await discovery.resolve('user.getById')).map((i) => i.id)).toEqual(['echo-1', 'echo-2']);
+    expect(await discovery.resolve('user.list')).toEqual([
       { id: 'echo-1', service: 'echo', host: '127.0.0.1', port: 4001 },
     ]);
-    expect(await discovery.resolve('example', 'auth.login')).toEqual([]);
-    expect(await discovery.resolve('other-project', 'user.list')).toEqual([]);
+    expect(await discovery.resolve('auth.login')).toEqual([]);
     expect(discovery.patterns()).toEqual(['user.getById', 'user.list']);
   });
 
@@ -64,7 +62,7 @@ describe('RegistryDiscovery', () => {
 
     expect(calls[0].ifNoneMatch).toBeUndefined();
     expect(calls[1].ifNoneMatch).toBe('"boot-1"');
-    expect(await discovery.resolve('example', 'user.list')).toHaveLength(1);
+    expect(await discovery.resolve('user.list')).toHaveLength(1);
   });
 
   it('replaces the table when the snapshot changes and notifies listeners', async () => {
@@ -76,8 +74,8 @@ describe('RegistryDiscovery', () => {
 
     await discovery.refresh();
 
-    expect((await discovery.resolve('example', 'user.getById')).map((i) => i.id)).toEqual(['echo-2']);
-    expect(await discovery.resolve('example', 'user.list')).toEqual([]);
+    expect((await discovery.resolve('user.getById')).map((i) => i.id)).toEqual(['echo-2']);
+    expect(await discovery.resolve('user.list')).toEqual([]);
     expect(listener).toHaveBeenCalledWith(['user.getById']);
   });
 
@@ -96,7 +94,7 @@ describe('RegistryDiscovery', () => {
     expect(await discovery.refresh()).toBe('failed');
     expect(await discovery.refresh()).toBe('failed');
 
-    expect(await discovery.resolve('example', 'user.list')).toHaveLength(1); // vẫn còn bảng cũ
+    expect(await discovery.resolve('user.list')).toHaveLength(1); // vẫn còn bảng cũ
     expect(logger.warn).toHaveBeenCalledTimes(1); // chỉ log lúc chuyển sang lỗi, không log mỗi lần
     expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('keeping the last snapshot (1 instance(s))'));
 
@@ -111,12 +109,12 @@ describe('RegistryDiscovery', () => {
 
     await discovery.start(); // không ném lỗi: gateway vẫn khởi động được
 
-    expect(await discovery.resolve('example', 'user.list')).toEqual([]);
+    expect(await discovery.resolve('user.list')).toEqual([]);
     expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('unreachable at startup'));
 
     await jest.advanceTimersByTimeAsync(3_000); // lần poll kế tiếp
 
-    expect(await discovery.resolve('example', 'user.list')).toHaveLength(1);
+    expect(await discovery.resolve('user.list')).toHaveLength(1);
     discovery.close();
   });
 
@@ -144,7 +142,7 @@ describe('RegistryDiscovery', () => {
     expect(await discovery.refresh()).toBe('failed');
     expect(await discovery.refresh()).toBe('changed');
 
-    expect(await discovery.resolve('example', 'user.list')).toHaveLength(1);
+    expect(await discovery.resolve('user.list')).toHaveLength(1);
     expect(logger.warn).toHaveBeenCalledWith('Ignored 1 malformed instance(s) in the registry snapshot.');
   });
 
@@ -153,8 +151,8 @@ describe('RegistryDiscovery', () => {
     const { discovery } = create(fn);
     await discovery.refresh();
 
-    (await discovery.resolve('example', 'user.list')).pop();
+    (await discovery.resolve('user.list')).pop();
 
-    expect(await discovery.resolve('example', 'user.list')).toHaveLength(1);
+    expect(await discovery.resolve('user.list')).toHaveLength(1);
   });
 });

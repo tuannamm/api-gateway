@@ -25,11 +25,7 @@ async function bootstrap(): Promise<void> {
 
   const { config, spec, unservedPatterns } = gateway;
   logger.log(`Project "${config.project}": ${spec.title} v${spec.version}, ${spec.routes.length} route(s)`);
-  logger.log(
-    config.discovery.kind === 'registry'
-      ? `Discovery: registry ${config.discovery.url} (poll every ${config.discovery.pollIntervalMs}ms)`
-      : `Discovery: static file ${config.discovery.file}`,
-  );
+  logger.log(`Discovery: registry ${config.discovery.url} (poll every ${config.discovery.pollIntervalMs}ms)`);
   if (unservedPatterns.length > 0) {
     logger.warn(`No instance registered for: ${unservedPatterns.join(', ')} (requests will get 503)`);
   }

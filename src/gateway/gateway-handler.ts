@@ -102,7 +102,7 @@ export class GatewayHandler {
       };
 
       // 3. Ai xử lý pattern này?
-      const instances = await this.options.discovery.resolve(this.options.project, route.operationId);
+      const instances = await this.options.discovery.resolve(route.operationId);
       if (instances.length === 0) {
         this.logger.warn(`[${requestId}] no instance handles pattern "${route.operationId}"`);
         throw new GatewayError(
@@ -145,8 +145,8 @@ export class GatewayHandler {
     payload: GatewayRequest,
     requestId: string,
   ): Promise<unknown> {
-    const key = `${this.options.project}|${pattern}`;
-    const candidates = this.options.balancer.order(key, instances).slice(0, this.options.maxAttempts);
+    // Một gateway chỉ phục vụ một project nên khoá cân bằng tải chỉ cần là pattern.
+    const candidates = this.options.balancer.order(pattern, instances).slice(0, this.options.maxAttempts);
     const failed: string[] = [];
 
     for (const instance of candidates) {

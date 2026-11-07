@@ -23,7 +23,7 @@
 | 11 | Nền HTTP: NestJS (Fastify adapter) | Core viết framework-agnostic để tái sử dụng |
 | 12 | **Không làm** ở gateway: API versioning, contract test spec vs service, WebSocket/SSE (khi nào cần mới làm), tối ưu hiệu năng (sau khi đưa vào dùng) | Người viết spec chịu trách nhiệm spec chính xác |
 | 13 | Registry lưu **in-memory** (soft state) | Registry khởi động lại thì service tự đăng ký lại qua heartbeat (mục 8) |
-| 14 | Code tự đăng ký là **lib dùng chung** `packages/registry-client` | Khác hợp đồng (vài dòng type, copy được): đây là logic có timer, retry, đọc metadata NestJS; copy sẽ lệch nhau. Lib được đóng gói vào từng service khi build |
+| 14 | Code tự đăng ký là **lib dùng chung** `libs/service-discovery-client` (`@org/service-discovery-client`) | Khác hợp đồng (vài dòng type, copy được): đây là logic có timer, retry, đọc metadata NestJS; copy sẽ lệch nhau. Lib được đóng gói vào từng service khi build |
 | 15 | Gateway **đồng bộ snapshot nền** từ registry (ETag/304) | Data plane chỉ đọc bộ nhớ; registry chết thì giữ bản cũ |
 | 16 | Gateway khởi động khi registry chết: **vẫn chạy, thử lại nền** | Chọn AP: registry chết không kéo gateway chết theo (bảng rỗng → 503 tới khi đồng bộ được) |
 | 17 | **Không dùng DDD chiến thuật cho gateway**; tổ chức theo hexagonal | Gateway là hạ tầng, không có domain. DDD dành cho service nghiệp vụ (mục 4) |
@@ -51,8 +51,8 @@ Cột "Nguồn cấu hình" cho thấy tính năng nào được điều khiển
 | Chức năng | Làm gì | Nguồn cấu hình | Bước |
 |---|---|---|---|
 | **Routing** | Khớp `method + path` với route trong spec; tự trả 404/405 | `paths` | 1 |
-| **Pattern resolution** | Hỏi registry: instance nào xử lý `operationId` này trong project (có cache) | `operationId` | 2, 3 |
-| **Load balancing** | Round-robin theo từng `project\|pattern` | - | 3 ✅ |
+| **Pattern resolution** | Hỏi registry: instance nào xử lý `operationId` này (đồng bộ snapshot nền) | `operationId` | 2, 3 |
+| **Load balancing** | Round-robin theo từng `pattern` | - | 3 ✅ |
 | **Failover** | Instance chắc chắn chưa nhận request (`ECONNREFUSED`…) thì thử instance kế | `GATEWAY_FAILOVER_MAX_ATTEMPTS` | 3 ✅ |
 | **Protocol translation** | Dựng payload từ HTTP, gửi `send(pattern, payload)` qua TCP, map kết quả về HTTP | `responses` (status 2xx) | 2 |
 | **Connection pool** | Giữ kết nối TCP theo `host:port`, đóng khi instance biến mất | - | 2, 3 |
@@ -135,7 +135,7 @@ Gateway nhận HTTP, dựng payload, gửi message, đợi kết quả, rồi tr
 - **Khả năng đa ngôn ngữ phụ thuộc giao thức**, không phụ thuộc cách tổ chức code:
   - Service → Registry: HTTP + JSON → service ngôn ngữ nào cũng đăng ký được.
   - Gateway → Service: TCP của NestJS → service phía sau gần như phải là NestJS (đánh đổi đã chấp nhận; thay được bằng một transport adapter khác, VD gRPC, mà không sửa handler).
-- Ánh xạ hexagonal: lõi = `GatewayHandler`, `RouteTable`, `RoundRobinBalancer`; port = `ServiceDiscovery`, `RpcTransport`, `LoadBalancer`; adapter phía ra = `StaticDiscovery`, `TcpTransport` (sau: `RegistryDiscovery`); adapter phía vào = controller, filter, `create-app.ts`.
+- Ánh xạ hexagonal: lõi = `GatewayHandler`, `RouteTable`, `RoundRobinBalancer`; port = `ServiceDiscovery`, `RpcTransport`, `LoadBalancer`; adapter phía ra = `RegistryDiscovery`, `TcpTransport`; adapter phía vào = controller, filter, `create-app.ts`.
 - **Không dùng DDD chiến thuật** (entity, aggregate, repository) cho gateway vì không có domain nghiệp vụ. DDD dùng trong service nghiệp vụ (order, payment...); chia hệ thống thành microservices chính là DDD chiến lược (mỗi service một bounded context).
 
 ---
@@ -164,7 +164,7 @@ Client: GET /users/42?active=true   (Authorization: Bearer ...)
  3. (Bước 4) Auth theo `security`, validate, rate limit
  4. Dựng payload GatewayRequest (allowlist, mục 7)
  5. Discovery: ai xử lý ("shop", "user.getById")? → [10.0.0.5:4001, ...] (cache); rỗng → 503
- 6. Round-robin (theo project|pattern) cho ra thứ tự thử [A, B, C]
+ 6. Round-robin (theo pattern) cho ra thứ tự thử [A, B, C]
  7. ClientTCP(host:port).send("user.getById", payload) với timeout
       chưa kết nối được (ECONNREFUSED…) → thử instance kế (failover), tối đa GATEWAY_FAILOVER_MAX_ATTEMPTS
       lỗi khác (timeout, đứt giữa chừng, lỗi service) → KHÔNG thử lại
@@ -221,12 +221,12 @@ interface GatewayRpcError { statusCode: number; message: string; code?: string; 
 
 ## 8. Service Discovery và ranh giới với gateway
 
-**Tra theo pattern, không theo tên service.** Spec chỉ có `operationId`. Mỗi service khi đăng ký khai báo các `@MessagePattern` nó xử lý; gateway hỏi registry "trong project này, instance nào xử lý pattern X?".
+**Tra theo pattern, không theo tên service.** Spec chỉ có `operationId`. Mỗi service khi đăng ký khai báo các `@MessagePattern` nó xử lý; gateway hỏi registry "instance nào xử lý pattern X?". Mỗi project application có **registry riêng**, nên registry và `ServiceDiscovery` không có khái niệm project (đổi ngày 2026-11-07, xem `apps/service-discovery/documents/PLAN.md` mục 10d).
 
 ```ts
 interface ServiceDiscovery {
-  /** Instance healthy xử lý `pattern` trong `project`. Rỗng → gateway trả 503. */
-  resolve(project: string, pattern: string): Promise<Instance[]>;
+  /** Instance healthy xử lý `pattern`. Rỗng → gateway trả 503. */
+  resolve(pattern: string): Promise<Instance[]>;
   watch?(project: string, cb: (table: Map<string, Instance[]>) => void): () => void;
 }
 
@@ -241,24 +241,16 @@ interface Instance {
 
 Dữ liệu đăng ký (service gửi lên registry):
 ```json
-{ "project": "shop", "service": "user", "id": "user-1", "host": "10.0.0.5", "port": 4001,
+{ "service": "user", "id": "user-1", "host": "10.0.0.5", "port": 4001,
   "patterns": ["user.getById", "user.create"] }
 ```
 
-- Pattern được tra **trong phạm vi project**: hai project dùng chung tên pattern không lẫn nhau.
-- **Một pattern chỉ thuộc một service** trong một project. Registry từ chối đăng ký nếu service khác đã giữ pattern đó (tránh hai service cùng nhận một request).
+- Registry phục vụ **đúng một project**: không có phạm vi project khi tra pattern.
+- **Một pattern chỉ thuộc một service** trong registry. Registry từ chối đăng ký nếu service khác đã giữ pattern đó (tránh hai service cùng nhận một request).
 - API registry, cơ chế heartbeat/TTL và cách gateway đồng bộ: xem **mục 16 (Kế hoạch Service Registry)**.
 - NestJS không tự liệt kê `@MessagePattern`; `registry-client` tự thu thập bằng `DiscoveryService` + `MetadataScanner` của NestJS.
 - Đánh đổi: gateway **không kiểm tra được lúc khởi động** pattern nào chưa có service xử lý (registry thay đổi liên tục), chỉ biết lúc request (503). Gateway log lại danh sách pattern chưa có ai xử lý mỗi khi snapshot thay đổi.
-- Lộ trình: `StaticDiscovery` (✅ Bước 2) → registry riêng (`apps/service-discovery`, ✅) → `RegistryDiscovery` (✅ Bước 7, `src/gateway/discovery/registry-discovery.ts`). Cả hai cùng implements `ServiceDiscovery`, chọn bằng env: `GATEWAY_REGISTRY_URL` **hoặc** `GATEWAY_DISCOVERY_FILE`.
-- **Định dạng file `GATEWAY_DISCOVERY_FILE`** (cùng hình dạng với dữ liệu đăng ký ở trên; ví dụ: `discovery.local.json`):
-  ```json
-  { "instances": [
-      { "project": "example", "service": "echo", "id": "echo-1",
-        "host": "127.0.0.1", "port": 4001,
-        "patterns": ["user.getById", "user.list", "user.create", "auth.login"] } ] }
-  ```
-  Validate lúc khởi động (gom mọi lỗi): thiếu field, port sai, id trùng, hai service khác nhau giữ cùng một pattern trong một project.
+- Lộ trình: `StaticDiscovery` (Bước 2, file JSON tạm) → registry riêng (`apps/service-discovery`, ✅) → `RegistryDiscovery` (✅ Bước 7, `src/gateway/discovery/registry-discovery.ts`). Khi đã có registry, **`StaticDiscovery` và `GATEWAY_DISCOVERY_FILE` đã bị gỡ**: gateway chỉ còn một nguồn instance (`GATEWAY_REGISTRY_URL`, bắt buộc). Test dùng `ServiceDiscovery` giả viết ngay trong file test.
 - Với registry, gateway giữ **snapshot trong RAM** và **stale-on-error** (registry lỗi thì dùng bản cũ).
 
 ---
@@ -373,7 +365,7 @@ specs/
 | Khớp path, sai method | 405 + `Allow` |
 | Không có instance healthy nào xử lý pattern | 503 |
 | Pattern trong spec chưa có service nào đăng ký | Không chặn lúc khởi động (registry là động); 503 lúc request + log rõ pattern |
-| Hai service cùng đăng ký một pattern trong một project | Registry từ chối đăng ký thứ hai |
+| Hai service cùng đăng ký một pattern | Registry từ chối đăng ký thứ hai |
 | Service có instance nhưng không có `@MessagePattern` tương ứng | Service trả lỗi "no matching handler" → gateway trả 502 và log rõ (lỗi cấu hình spec) |
 | Không kết nối được / quá timeout | 502 / 504 |
 | Spec đổi lúc đang chạy | Dựng route table mới rồi atomic swap; spec lỗi thì giữ bảng cũ |
@@ -413,7 +405,7 @@ src/
     ├── bootstrap.ts                                   gom control plane
     ├── gateway-handler.ts                             data plane: match → payload → resolve → send → map lỗi
     ├── contracts.ts, request-id.ts, problem.ts
-    ├── discovery/ (types, static-discovery)
+    ├── discovery/ (types, registry-discovery)
     └── transport/ (types, tcp-transport)
 ```
 
@@ -423,19 +415,19 @@ src/
 
 ## 16. Kế hoạch Service Registry (Bước 7, ✅ đã làm)
 
-> Đã triển khai. Thiết kế chi tiết, quyết định phát sinh khi code và kết quả chạy thật: `apps/service-discovery/documents/PLAN.md`. Khác plan bên dưới: client là **bản copy** trong `echo-service/src/registry/` (các app là repo riêng), không phải `packages/registry-client`.
+> Đã triển khai. Thiết kế chi tiết, quyết định phát sinh khi code và kết quả chạy thật: `apps/service-discovery/documents/PLAN.md`. Khác plan bên dưới: **không có project trong registry** (mọi URL bỏ `/projects/:project`, `resolve(pattern)`); client là lib `libs/service-discovery-client` (không phải `packages/registry-client`).
 
 **Bối cảnh:** gateway đang đọc instance từ file tĩnh: thêm/bớt instance phải sửa file và restart; instance chết vẫn nằm trong danh sách nên round-robin vẫn chọn nó (hạn chế của Bước 3).
 
 **Mục tiêu:** service **tự đăng ký** kèm danh sách `@MessagePattern`, giữ đăng ký bằng **heartbeat**, hết **TTL** thì bị gỡ; gateway **đồng bộ snapshot** ở nền.
 
 ```
-echo-1 ─┐ PUT /v1/projects/example/instances/echo-1   (đăng ký + heartbeat mỗi 5s, kèm patterns)
+echo-1 ─┐ PUT /v1/instances/echo-1   (đăng ký + heartbeat mỗi 5s, kèm patterns)
 echo-2 ─┤
         ▼
   Service Registry  (in-memory, lease TTL 15s, quét hết hạn mỗi TTL/3)
         ▲
-        │ GET /v1/projects/example/snapshot   (mỗi 3s, If-None-Match → 304 nếu không đổi)
+        │ GET /v1/snapshot   (mỗi 3s, If-None-Match → 304 nếu không đổi)
   API Gateway: snapshot trong RAM → resolve() chỉ đọc bộ nhớ
 ```
 
@@ -450,29 +442,29 @@ App đã được bạn scaffold sẵn; làm theo đúng khung đó:
 - Thay các file scaffold mẫu (`app.controller.ts`, `app.service.ts`...) bằng code registry.
 
 **Core thuần** `RegistryStore` (clock tiêm vào để test điều khiển thời gian):
-- `register(project, entry)`: upsert `{ id, service, host, port, patterns }`, cập nhật `lastSeen`. **Heartbeat chính là gọi lại register** với đủ dữ liệu (idempotent), nên registry mất dữ liệu thì heartbeat kế tiếp tự khôi phục (soft state).
-- Xung đột: pattern đang thuộc service khác (còn instance sống) trong cùng project → 409 `PATTERN_CONFLICT`.
-- `deregister(project, id)`; `sweep()` gỡ instance có `now - lastSeen > leaseTtl`.
-- `snapshot(project)` → `{ version, instances }`; `version` **chỉ tăng khi bảng đổi** (heartbeat thuần không tăng) nên gateway nhận 304.
+- `register(id, body)`: upsert `{ id, service, host, port, patterns }`, cập nhật `lastSeen`. **Heartbeat chính là gọi lại register** với đủ dữ liệu (idempotent), nên registry mất dữ liệu thì heartbeat kế tiếp tự khôi phục (soft state).
+- Xung đột: pattern đang thuộc service khác (còn instance sống) → 409 `PATTERN_CONFLICT`.
+- `deregister(id)`; `sweep()` gỡ instance có `now - lastSeen > leaseTtl`.
+- `snapshot()` → `{ version, instances }`; `version` **chỉ tăng khi bảng đổi** (heartbeat thuần không tăng) nên gateway nhận 304.
 
 **HTTP API:**
 | Method | Path | Ý nghĩa |
 |---|---|---|
-| `PUT` | `/v1/projects/:project/instances/:id` | Đăng ký / heartbeat → `{ leaseTtlMs, heartbeatIntervalMs }`; 400 sai dữ liệu, 409 xung đột |
-| `DELETE` | `/v1/projects/:project/instances/:id` | Huỷ đăng ký (204) |
-| `GET` | `/v1/projects/:project/snapshot` | Bảng instance + `ETag`; `If-None-Match` khớp → 304 |
-| `GET` | `/v1/projects` | Danh sách project (debug) |
+| `PUT` | `/v1/instances/:id` | Đăng ký / heartbeat → `{ leaseTtlMs, heartbeatIntervalMs }`; 400 sai dữ liệu, 409 xung đột |
+| `DELETE` | `/v1/instances/:id` | Huỷ đăng ký (204) |
+| `GET` | `/v1/snapshot` | Bảng instance + `ETag`; `If-None-Match` khớp → 304 |
 | `GET` | `/health` | Liveness |
 
-- Lỗi theo RFC 9457; validate regex project/service, port, patterns, giới hạn body.
+- Lỗi theo RFC 9457; validate regex service, port, patterns, giới hạn body.
 - Tuỳ chọn `REGISTRY_TOKEN`: nếu đặt, `PUT`/`DELETE` cần header `x-registry-token` (registry chỉ mở trong mạng nội bộ).
 - Env: `PORT` (8500), `REGISTRY_LEASE_TTL_MS` (15000), `REGISTRY_TOKEN`.
 
-### Phần 2: `packages/registry-client` (`@org/registry-client`, NestJS module) + echo-service
-- `RegistryModule.forRoot({ registryUrl, project, service, advertiseHost, port, instanceId?, token? })` + biến thể đọc env.
+### Phần 2: `libs/service-discovery-client` (`@org/service-discovery-client`, NestJS module) + echo-service
+> Đã làm xong dạng lib ngày 2026-11-07 (trước đó từng là bản copy trong echo-service). Chi tiết: `apps/service-discovery/documents/PLAN.md` mục 10e. Service chỉ cần `ServiceDiscoveryModule.forRoot()` + env `REGISTRY_URL`, `PORT`.
+- `ServiceDiscoveryModule.forRoot()` đọc cấu hình từ env (option ghi đè được).
 - **Tự thu thập pattern** bằng `DiscoveryService` + `MetadataScanner`; chỉ lấy `@MessagePattern`, **bỏ `@EventPattern`**; pattern không phải string thì bỏ qua và cảnh báo.
 - Vòng đời: bootstrap → đăng ký + heartbeat (timer `unref`); registry chết → service **vẫn chạy**, thử lại nhịp kế; 409 → log lỗi rõ; shutdown → `DELETE` (best effort) để gateway thôi gửi ngay, không chờ TTL.
-- **`advertiseHost`** (`REGISTRY_ADVERTISE_HOST`): địa chỉ gateway dùng để gọi tới. Service lắng nghe `0.0.0.0` nhưng **không được** quảng bá `0.0.0.0`.
+- **`advertiseHost`** (`SERVICE_ADVERTISE_HOST`, mặc định tự phát hiện IPv4 không phải loopback): địa chỉ gateway dùng để gọi tới. Service lắng nghe `0.0.0.0` nhưng **không được** quảng bá `0.0.0.0`.
 - `instanceId` mặc định `<service>-<hostname>-<port>`.
 - Tạo bằng generator `@nx/js:library`; app phụ thuộc build lib (`dependsOn: ^build`); Jest map tới source lib.
 - echo-service import module khi có `REGISTRY_URL`; không có thì chạy như cũ.
@@ -482,11 +474,11 @@ App đã được bạn scaffold sẵn; làm theo đúng khung đó:
   - `start()`: tải snapshot lần đầu; thất bại vẫn trả về (bảng rỗng) và thử lại nền.
   - Poll mỗi `GATEWAY_REGISTRY_POLL_MS` (3000) với `If-None-Match`; lỗi → giữ bản cũ, log có giới hạn tần suất.
   - Snapshot đổi → log lại pattern chưa có ai xử lý.
-- `config.ts`: `GATEWAY_REGISTRY_URL` **hoặc** `GATEWAY_DISCOVERY_FILE` (đúng một trong hai); thêm `GATEWAY_REGISTRY_POLL_MS`.
+- `config.ts`: `GATEWAY_REGISTRY_URL` bắt buộc (đã gỡ `GATEWAY_DISCOVERY_FILE`); thêm `GATEWAY_REGISTRY_POLL_MS`.
 - Hệ quả: instance bị kill (không deregister) bị gỡ sau tối đa `leaseTtl + poll` (~18s), round-robin thôi chọn nó.
 
 ### Test
-- Registry: unit `RegistryStore` (Node 22) — đăng ký, heartbeat không tăng version, hết TTL, xung đột, giải phóng pattern, đăng ký lại pattern khác, deregister, cách ly project; e2e HTTP (Node ≥ 24.9).
+- Registry: unit `RegistryStore` (Node 22) — đăng ký, heartbeat không tăng version, hết TTL, xung đột, giải phóng pattern, đăng ký lại pattern khác, deregister; e2e HTTP (Node ≥ 24.9).
 - Client: heartbeat theo nhịp, registry lỗi không crash, deregister khi tắt (fake fetch + fake timers); thu thập đúng message pattern (Node ≥ 24.9).
 - Gateway: `RegistryDiscovery` (lần đầu, 304, lỗi giữ bản cũ, khởi động khi registry chết rồi phục hồi); `config.spec` hai chế độ.
 

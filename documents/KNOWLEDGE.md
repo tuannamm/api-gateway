@@ -24,7 +24,7 @@
 | 4 | Routing: segment trie / radix tree | 1 | ✅ |
 | 5 | Fail-fast và validate cấu hình | 1 | ✅ |
 | 6 | Protocol translation (HTTP → RPC) và reverse proxy | 2 | ✅ |
-| 7 | Service discovery | 2, 7 | ✅ (StaticDiscovery + RegistryDiscovery) |
+| 7 | Service discovery | 2, 7 | ✅ (RegistryDiscovery; StaticDiscovery đã gỡ) |
 | 8 | Caching, TTL, stale-on-error | 7 | ✅ đồng bộ snapshot + ETag |
 | 9 | Load balancing | 3 | ✅ round-robin + failover |
 | 10 | Authentication / Authorization | 4 | ⬜ |
@@ -102,7 +102,7 @@ Câu mở đầu gần như chắc chắn: *"Kể về một dự án bạn đã
 | Trả lời câu hỏi | "Luật là gì?" | "Áp luật này cho request này thế nào?" |
 | Tần suất | Hiếm (khởi động, spec đổi) | Mỗi request |
 | Ưu tiên | Đúng, báo lỗi rõ | Nhanh, ổn định |
-| Trong gateway này | `loadConfig`, `loadSpec`, `RouteTable.from`, `StaticDiscovery.fromFile` (gom trong `bootstrap.ts`) | `GatewayController` catch-all → `GatewayHandler.handle`: match → resolve → TCP send → map lỗi |
+| Trong gateway này | `loadConfig`, `loadSpec`, `RouteTable.from`, `RegistryDiscovery.start` (gom trong `bootstrap.ts`) | `GatewayController` catch-all → `GatewayHandler.handle`: match → resolve → TCP send → map lỗi |
 
 **Ý chính:**
 - Việc nặng (parse yml, validate, build trie) làm **một lần** ở control plane. Data plane chỉ **đọc** bộ nhớ.
@@ -197,7 +197,7 @@ Câu mở đầu gần như chắc chắn: *"Kể về một dự án bạn đã
 
 **Tóm tắt:** Phát hiện lỗi cấu hình **lúc khởi động**, không để người dùng gặp lỗi lúc runtime.
 
-**Trong dự án:** gateway từ chối khởi động (exit 1, chưa mở cổng) khi: spec không hợp lệ OpenAPI; `operationId` thiếu, rỗng, có khoảng trắng đầu/cuối, hoặc trùng; hai route chỉ khác tên tham số; env sai (project không tồn tại, số không hợp lệ); file discovery sai (thiếu field, port sai, hai service giữ cùng pattern). Gom **tất cả** lỗi rồi báo một lần để sửa một lượt.
+**Trong dự án:** gateway từ chối khởi động (exit 1, chưa mở cổng) khi: spec không hợp lệ OpenAPI; `operationId` thiếu, rỗng, có khoảng trắng đầu/cuối, hoặc trùng; hai route chỉ khác tên tham số; env sai (project không tồn tại, số không hợp lệ, thiếu hoặc sai `GATEWAY_REGISTRY_URL`). Registry chết lúc khởi động thì **không** fail (AP): mở cổng, trả 503 tới khi đồng bộ được. Gom **tất cả** lỗi rồi báo một lần để sửa một lượt.
 
 **Hot-reload:** spec mới lỗi thì giữ cấu hình cũ và ghi log, không làm sập hệ thống đang chạy.
 
@@ -288,20 +288,20 @@ Câu mở đầu gần như chắc chắn: *"Kể về một dự án bạn đã
 - **Self-registration:** service tự đăng ký và gửi heartbeat.
 - **Third-party registration:** một thành phần khác (orchestrator) đăng ký thay service.
 
-**Trong dự án:** registry là **project riêng**. Gateway chỉ biết một interface:
+**Trong dự án:** registry là **project riêng** (và mỗi project application chạy **một registry riêng**). Gateway chỉ biết một interface:
 
 ```ts
 interface ServiceDiscovery {
-  resolve(project: string, pattern: string): Promise<Instance[]>; // chỉ instance healthy
+  resolve(pattern: string): Promise<Instance[]>; // chỉ instance healthy
 }
 ```
 
-**Tra theo pattern thay vì tên service:** service đăng ký kèm danh sách `@MessagePattern` (`patterns: ["user.getById", ...]`), registry giữ bảng `pattern → instances` theo từng project.
+**Tra theo pattern thay vì tên service:** service đăng ký kèm danh sách `@MessagePattern` (`patterns: ["user.getById", ...]`), registry giữ bảng `pattern → instances`.
 - Ưu: spec gọn, không phải ghi tên service; chuyển một pattern sang service khác (tách service) chỉ cần deploy lại service, không sửa spec.
 - Nhược: gateway không kiểm tra được lúc khởi động pattern nào chưa có ai xử lý (chỉ biết lúc request → 503); registry phải chặn **hai service cùng giữ một pattern**.
 - Đây chính là ý tưởng **capability-based discovery**: tìm theo "khả năng" (xử lý được gì), không theo "tên".
 
-Ban đầu dùng `StaticDiscovery`, sau thêm `RegistryDiscovery` mà **không sửa một dòng `GatewayHandler`**. Đây là **Dependency Inversion** / Adapter pattern.
+Ban đầu dùng `StaticDiscovery` (file JSON), sau thay bằng `RegistryDiscovery` mà **không sửa một dòng `GatewayHandler`**, rồi gỡ hẳn bản file khi registry đã chạy. Đây là **Dependency Inversion** / Adapter pattern.
 
 **Phía gateway cần có:** dữ liệu instance trong RAM (không gọi registry mỗi request) và stale-on-error (registry chết thì dùng bản cũ). Dự án chọn **đồng bộ snapshot nền** (xem #8) thay vì cache theo từng pattern.
 
@@ -330,7 +330,7 @@ Ban đầu dùng `StaticDiscovery`, sau thêm `RegistryDiscovery` mà **không s
 **Hai cách gateway lấy dữ liệu từ registry:**
 | | Tra theo từng request + cache TTL | **Đồng bộ snapshot nền (dự án chọn)** |
 |---|---|---|
-| Cách làm | Request đầu của mỗi pattern gọi registry, cache vài giây | Timer nền tải toàn bộ bảng của project mỗi 3s |
+| Cách làm | Request đầu của mỗi pattern gọi registry, cache vài giây | Timer nền tải toàn bộ bảng mỗi 3s |
 | Request có phải chờ registry? | Có, ở lần đầu và mỗi lần hết hạn | **Không bao giờ**: chỉ đọc RAM (đúng tinh thần data plane) |
 | Cache stampede | Có thể xảy ra, cần single-flight | **Không có**: chỉ một timer gọi registry |
 | Registry chết | Hết TTL là mất dữ liệu nếu không làm stale-on-error | Giữ snapshot cuối (stale-on-error tự nhiên) |
@@ -365,7 +365,7 @@ Ban đầu dùng `StaticDiscovery`, sau thêm `RegistryDiscovery` mà **không s
 
 **Trong code (Bước 3):** `src/gateway/load-balancer.ts`, vòng lặp `sendWithFailover` trong `src/gateway/gateway-handler.ts`.
 - Load balancer trả về **thứ tự thử** chứ không chỉ một instance: `[A, B, C]` → `[B, C, A]` → `[C, A, B]`. Phần tử đầu là lựa chọn chính, phần còn lại để failover. Chọn instance và failover dùng chung một thứ tự nên không cần thêm logic.
-- **Bộ đếm theo từng `project|pattern`**: bộ đếm chung cho mọi pattern sẽ lệch. Ví dụ request xen kẽ `user.getById`, `user.list` với 2 instance: bộ đếm chung khiến mỗi pattern luôn rơi vào một instance.
+- **Bộ đếm theo từng `pattern`**: bộ đếm chung cho mọi pattern sẽ lệch. Ví dụ request xen kẽ `user.getById`, `user.list` với 2 instance: bộ đếm chung khiến mỗi pattern luôn rơi vào một instance.
 - **Sắp theo `id` trước khi xoay**: thứ tự không phụ thuộc thứ tự registry trả về.
 - Bộ đếm lưu phần dư (`% n`) để không tăng vô hạn.
 - Kiểm chứng thật: 2 echo → mỗi echo nhận 2/4 request.
@@ -546,7 +546,7 @@ Ba trụ cột:
 
 ## 15. Đóng gói và triển khai
 
-- Docker image chạy được cho nhiều project: cấu hình qua **env** (`GATEWAY_PROJECT`, `GATEWAY_DISCOVERY_FILE`, `GATEWAY_RPC_TIMEOUT_MS`, `GATEWAY_BODY_LIMIT`, `PORT`), mount thư mục `specs/`. Cùng một image, khác env là thành gateway của project khác (nguyên tắc **12-factor**: cấu hình nằm ở môi trường, không nằm trong code).
+- Docker image chạy được cho nhiều project: cấu hình qua **env** (`GATEWAY_PROJECT`, `GATEWAY_REGISTRY_URL`, `GATEWAY_RPC_TIMEOUT_MS`, `GATEWAY_BODY_LIMIT`, `PORT`), mount thư mục `specs/`. Cùng một image, khác env là thành gateway của project khác (nguyên tắc **12-factor**: cấu hình nằm ở môi trường, không nằm trong code).
 - Graceful shutdown: ngừng nhận request mới, chờ request đang xử lý xong rồi mới thoát. **Đã có một phần:** `enableShutdownHooks()` + `GatewayModule.onApplicationShutdown` đóng mọi kết nối TCP khi nhận SIGTERM.
 - Stateless: gateway không giữ trạng thái cục bộ để scale ngang được.
 - Tài liệu "dùng cho project mới trong 5 phút".
@@ -571,22 +571,22 @@ Ba trụ cột:
 
 **Thiết kế trong dự án** (chi tiết: PLAN.md mục 16):
 ```
-service ──PUT /v1/projects/:project/instances/:id──► registry   (đăng ký + heartbeat, kèm patterns)
+service ──PUT /v1/instances/:id──► registry   (đăng ký + heartbeat, kèm patterns)
 service ──DELETE ...────────────────────────────────► registry   (huỷ đăng ký khi tắt)
-gateway ──GET /v1/projects/:project/snapshot (ETag)─► registry   (đồng bộ nền mỗi 3s)
+gateway ──GET /v1/snapshot (ETag)─► registry   (đồng bộ nền mỗi 3s)
 ```
 - **Lease + heartbeat:** mỗi lần đăng ký cấp một "hợp đồng thuê" 15s; service gia hạn bằng heartbeat mỗi 5s (lỡ 2 nhịp vẫn còn). Quá 15s không thấy thì bị gỡ.
 - **Heartbeat = đăng ký lại đầy đủ (idempotent PUT)**, không phải một API "ping" riêng. Nhờ vậy registry mất dữ liệu (khởi động lại) thì heartbeat kế tiếp tự khôi phục: đây là **soft state**, nên lưu in-memory là đủ (Eureka cũng làm vậy).
 - **Hai cách rời đi:**
   - Tắt êm (SIGTERM): service gọi `DELETE` → biến mất ngay ở lần poll kế của gateway.
   - Chết đột ngột (crash, SIGKILL): không kịp deregister → chờ hết lease TTL (~15s + chu kỳ poll). TTL là lưới an toàn cho trường hợp này.
-- **Xung đột pattern:** hai service khác nhau cùng giữ một pattern trong một project → 409. Pattern được giải phóng khi mọi instance của service chủ hết hạn.
+- **Xung đột pattern:** hai service khác nhau cùng giữ một pattern → 409. Pattern được giải phóng khi mọi instance của service chủ hết hạn.
 - **`version` chỉ tăng khi bảng đổi**, không tăng vì heartbeat → gateway nhận 304 phần lớn thời gian.
 - **Chọn AP:** registry chết thì gateway vẫn phục vụ bằng snapshot cũ; service vẫn chạy và tiếp tục thử heartbeat. Gateway khởi động khi registry chết thì vẫn mở cổng (503 cho tới khi đồng bộ được).
-- **Self-registration:** service tự đăng ký qua `packages/registry-client` (NestJS module tự thu thập `@MessagePattern`, bỏ `@EventPattern`).
+- **Self-registration:** service tự đăng ký qua `libs/service-discovery-client` (NestJS module `ServiceDiscoveryModule`, tự thu thập `@MessagePattern`, bỏ `@EventPattern`).
 
 **Bẫy cần biết trước:**
-- **Quảng bá `0.0.0.0`:** service lắng nghe `0.0.0.0` (mọi card mạng), nhưng nếu đăng ký đúng địa chỉ đó thì gateway sẽ kết nối tới `0.0.0.0` và thất bại. Phải đăng ký **địa chỉ mà bên khác dùng để gọi tới** (`REGISTRY_ADVERTISE_HOST`, trong Docker là tên service).
+- **Quảng bá `0.0.0.0`:** service lắng nghe `0.0.0.0` (mọi card mạng), nhưng nếu đăng ký đúng địa chỉ đó thì gateway sẽ kết nối tới `0.0.0.0` và thất bại. Phải đăng ký **địa chỉ mà bên khác dùng để gọi tới** (`SERVICE_ADVERTISE_HOST`, mặc định tự phát hiện; trong Docker là tên service).
 - **Đồng hồ:** registry tự đo `lastSeen` bằng đồng hồ của chính nó, không tin thời gian do service gửi lên (đồng hồ các máy lệch nhau).
 - **Timer chặn process thoát:** timer heartbeat phải `unref()`, nếu không service không tắt được khi chỉ còn timer chạy.
 
@@ -826,8 +826,8 @@ Nguyên tắc chung: chỉ tăng version khi có **breaking change**; thay đổ
 
 | Nguyên lý | Ở đâu trong code |
 |---|---|
-| **Dependency Inversion** | `GatewayHandler` phụ thuộc interface `ServiceDiscovery`, `RpcTransport`, không phụ thuộc `StaticDiscovery`, `TcpTransport` |
-| **Adapter** | `TcpTransport` bọc `ClientProxy` của NestJS; `StaticDiscovery` sau này thêm `RegistryDiscovery` (cùng interface, chọn bằng env) |
+| **Dependency Inversion** | `GatewayHandler` phụ thuộc interface `ServiceDiscovery`, `RpcTransport`, không phụ thuộc `RegistryDiscovery`, `TcpTransport`; test thay bằng bản giả |
+| **Adapter** | `TcpTransport` bọc `ClientProxy` của NestJS; `RegistryDiscovery` bọc HTTP API của registry (thay `StaticDiscovery` mà handler không đổi) |
 | **Single Responsibility** | Transport **phân loại** lỗi; handler **quyết định** mã HTTP; controller chỉ chuyển dữ liệu |
 | **Ports & Adapters (hexagonal)** | Core `src/gateway/` không biết NestJS/Fastify; NestJS chỉ là lớp vỏ |
 | **Fail-fast** | Mọi lỗi cấu hình ném ở `bootstrap`, trước khi mở cổng |
@@ -1115,3 +1115,4 @@ Mọi lỗi đi qua `toProblem()` thành **RFC 9457** `application/problem+json`
 | 2026-11-06 | Thiết kế Service Registry (chưa code); bàn DDD vs hexagonal | Heartbeat = đăng ký lại (soft state); snapshot + ETag thay cho cache theo request; "không phụ thuộc framework" khác "đa ngôn ngữ" | |
 | 2026-11-06 | Đọc lại đường đi của response từ service về gateway (mục 28) | Transport phân loại, handler dịch sang HTTP; `id` trong gói TCP cho phép dùng chung socket; status thành công lấy từ spec | |
 | 2026-11-06 | Bước 7: Service Registry + client trong echo-service + `RegistryDiscovery`; chạy thật 6 kịch bản | Poll `setTimeout` nối tiếp + ETag; stale-on-error; khởi động khi registry chết vẫn mở cổng (fail-fast chỉ cho lỗi cấu hình). Chi tiết: `apps/service-discovery/knowledge.html` | |
+| 2026-11-07 | Gỡ StaticDiscovery, `discovery.local.json`, `GATEWAY_DISCOVERY_FILE`: gateway chỉ đọc instance từ registry | Nhờ interface `ServiceDiscovery`, gỡ adapter cũ không đụng `GatewayHandler`; e2e dùng discovery giả trong bộ nhớ thay vì file fixture | |

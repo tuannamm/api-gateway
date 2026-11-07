@@ -13,24 +13,27 @@ Gateway contract-first: đọc một file OpenAPI, nhận HTTP từ client, dị
 ## Chạy local
 
 ```bash
-# Terminal 1: service giả (TCP :4001)
+# Terminal 1: Service Registry (HTTP :8500)
+cd apps/service-discovery && npm run start:dev
+
+# Terminal 2: echo-service (TCP :4001), tự đăng ký vào registry qua REGISTRY_URL
 npm exec nx run echo-service:start:dev
 
-# Terminal 2: gateway (HTTP :3000) cho project "example"
-cp .env.example .env        # lần đầu; gateway tự nạp .env khi khởi động
+# Terminal 3: gateway (HTTP :3000) cho project "example"
+# .env (gateway tự nạp khi khởi động; biến dòng lệnh thắng .env):
+#   GATEWAY_PROJECT=example
+#   GATEWAY_REGISTRY_URL=http://localhost:8500
 npm run start:dev
-# hoặc truyền thẳng (biến dòng lệnh thắng .env):
-# GATEWAY_PROJECT=example GATEWAY_DISCOVERY_FILE=discovery.local.json npm run start:dev
 
-# Terminal 3
+# Terminal 4
 curl -i localhost:3000/users/42
 ```
 
-Thử load balancing và failover với instance thứ hai (đã khai báo sẵn trong `discovery.local.json`):
+Thử load balancing và failover với instance thứ hai (tự đăng ký, gateway thấy sau ≤ 1 chu kỳ poll):
 
 ```bash
-# Terminal 4: instance thứ hai (TCP :4002)
-ECHO_PORT=4002 npm exec nx run echo-service:start:dev
+# Terminal 5: instance thứ hai (TCP :4002)
+PORT=4002 npm exec nx run echo-service:start:dev
 
 # Gọi nhiều lần: log của hai echo nhận lần lượt ([echo:4001] / [echo:4002])
 for i in 1 2 3 4; do curl -s localhost:3000/users/$i > /dev/null; done
@@ -38,7 +41,7 @@ for i in 1 2 3 4; do curl -s localhost:3000/users/$i > /dev/null; done
 # Tắt một echo: mọi request vẫn 200 nhờ failover (log gateway có cảnh báo "failing over")
 ```
 
-Khi chỉ chạy một echo, request đến lượt `echo-2` vẫn thành công nhờ failover.
+Tắt êm (Ctrl+C) thì echo huỷ đăng ký ngay; bị kill thì registry gỡ sau khi hết lease TTL. Trong khoảng đó failover giữ cho request vẫn thành công.
 
 Thử các nhánh lỗi:
 
@@ -55,8 +58,7 @@ curl -i -X POST localhost:3000/auth/logout           # 503 NO_INSTANCE
 | Biến | Bắt buộc | Mặc định | Ý nghĩa |
 |---|---|---|---|
 | `GATEWAY_PROJECT` | Có | - | Project cần phục vụ (`specs/<project>/openapi.yml`) |
-| `GATEWAY_REGISTRY_URL` | Một trong hai | - | Service Registry (VD `http://localhost:8500`); gateway poll snapshot nền |
-| `GATEWAY_DISCOVERY_FILE` | Một trong hai | - | File JSON của StaticDiscovery (không cần registry) |
+| `GATEWAY_REGISTRY_URL` | Có | - | Service Registry (VD `http://localhost:8500`); gateway poll snapshot nền |
 | `GATEWAY_REGISTRY_POLL_MS` | Không | `3000` | Chu kỳ poll registry (tối đa 60000) |
 | `GATEWAY_SPECS_DIR` | Không | `./specs` | Thư mục chứa spec |
 | `GATEWAY_SPEC_FILE` | Không | `openapi.yml` | Tên file spec |
@@ -70,7 +72,7 @@ curl -i -X POST localhost:3000/auth/logout           # 503 NO_INSTANCE
 1. Tạo `specs/<project>/openapi.yml`. Mọi operation phải có `operationId` không rỗng, không trùng.
 2. Service xử lý bằng `@MessagePattern('<operationId>')`, nhận `GatewayRequest`
    (hợp đồng: `src/gateway/contracts.ts`).
-3. Service tự đăng ký vào registry (`REGISTRY_URL`, xem `apps/service-discovery/README.md`), hoặc khai báo tay trong file discovery khi chạy không có registry.
+3. Service tự đăng ký vào registry (`REGISTRY_URL`, xem `apps/service-discovery/README.md`).
 
 ## Test
 

@@ -385,7 +385,7 @@ footer { color: var(--muted); font-size: 12.5px; padding-block: 0 32px; }
           <path class="edge tcp" d="M420 230 C 480 230, 490 332, 556 332" marker-end="url(#m-data)"/>
           <text class="small" x="430" y="203">TCP send(pattern)</text>
           <path class="edge dash" d="M310 270 V336" marker-end="url(#m-ctrl)" marker-start="url(#m-ctrl)"/>
-          <text class="small" x="318" y="306">resolve(project, pattern)</text>
+          <text class="small" x="318" y="306">resolve(pattern)</text>
           <path class="edge dash" d="M650 360 V376 H424" marker-end="url(#m-ctrl)"/>
           <text class="small" x="440" y="396">service tự đăng ký + danh sách pattern</text>
           <path class="edge dash" d="M310 150 V36 H870 V56" marker-end="url(#m-ctrl)"/>
@@ -617,8 +617,8 @@ footer { color: var(--muted); font-size: 12.5px; padding-block: 0 32px; }
     { t: 'Request id', file: 'request-id.ts', d: 'Giữ x-request-id của client nếu hợp lệ (≤128 ký tự, [A-Za-z0-9._-]), ngược lại sinh UUID. Mã này đi vào payload và mọi response, kể cả response lỗi.', fails: [] },
     { t: 'Match route', file: 'route-table.ts', d: 'Tra segment trie: nhánh tĩnh trước nhánh tham số, có backtrack theo method. Decode tham số sau khi match.', fails: ['404 ROUTE_NOT_FOUND', '405 METHOD_NOT_ALLOWED', '400 INVALID_PATH'] },
     { t: 'Dựng payload', file: 'gateway-handler.ts · contracts.ts', d: 'GatewayRequest { params, query, body, meta } dựng từ đầu theo allowlist. Header lạ của client không lọt xuống service.', fails: [] },
-    { t: 'Hỏi discovery', file: 'discovery/static-discovery.ts', d: 'Ai xử lý (project, operationId)? Tra theo pattern, không theo tên service. Rỗng nghĩa là chưa service nào đăng ký pattern này.', fails: ['503 NO_INSTANCE'] },
-    { t: 'Chọn instance', file: 'load-balancer.ts · gateway-handler.ts', d: 'Round-robin theo từng project|pattern cho ra thứ tự thử. Instance đầu chưa kết nối được (ECONNREFUSED) thì thử instance kế: an toàn kể cả POST vì service chưa hề nhận request.', fails: ['502 khi mọi instance đều không kết nối được'] },
+    { t: 'Hỏi discovery', file: 'discovery/static-discovery.ts', d: 'Ai xử lý operationId này? Tra theo pattern, không theo tên service. Rỗng nghĩa là chưa service nào đăng ký pattern này.', fails: ['503 NO_INSTANCE'] },
+    { t: 'Chọn instance', file: 'load-balancer.ts · gateway-handler.ts', d: 'Round-robin theo từng pattern cho ra thứ tự thử. Instance đầu chưa kết nối được (ECONNREFUSED) thì thử instance kế: an toàn kể cả POST vì service chưa hề nhận request.', fails: ['502 khi mọi instance đều không kết nối được'] },
     { t: 'Gửi TCP', file: 'transport/tcp-transport.ts', d: 'send(operationId, payload) qua connection pool, có timeout. Lỗi được phân loại: timeout, không kết nối được, không có handler, lỗi từ service.', fails: ['504 UPSTREAM_TIMEOUT', '502 UPSTREAM_UNAVAILABLE', '502 PATTERN_NOT_HANDLED', '502 UPSTREAM_ERROR'] },
     { t: 'Trả response', file: 'gateway-handler.ts · problem.ts', d: 'Thành công: status lấy từ responses trong spec (201, 204…). Lỗi nghiệp vụ theo hợp đồng: dùng statusCode và code của service.', fails: ['4xx/5xx từ service'] },
   ];

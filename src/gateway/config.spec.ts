@@ -4,11 +4,11 @@ import { ConfigError } from './errors';
 
 const APP_ROOT = path.resolve(__dirname, '../..');
 const FIXTURES = path.join(APP_ROOT, 'test/fixtures/specs');
-const DISCOVERY = path.join(APP_ROOT, 'test/fixtures/discovery.json');
+const REGISTRY_URL = 'http://localhost:8500';
 
 /** env tối thiểu trỏ vào thư mục fixture. */
 function env(overrides: Record<string, string | undefined>): NodeJS.ProcessEnv {
-  return { GATEWAY_SPECS_DIR: FIXTURES, GATEWAY_DISCOVERY_FILE: DISCOVERY, ...overrides };
+  return { GATEWAY_SPECS_DIR: FIXTURES, GATEWAY_REGISTRY_URL: REGISTRY_URL, ...overrides };
 }
 
 describe('loadConfig', () => {
@@ -22,11 +22,10 @@ describe('loadConfig', () => {
 
   it('defaults GATEWAY_SPECS_DIR to ./specs and resolves files relative to cwd', () => {
     const config = loadConfig(
-      { GATEWAY_PROJECT: 'example', GATEWAY_DISCOVERY_FILE: 'discovery.local.json' },
+      { GATEWAY_PROJECT: 'example', GATEWAY_REGISTRY_URL: REGISTRY_URL },
       APP_ROOT,
     );
     expect(config.specPath).toBe(path.join(APP_ROOT, 'specs', 'example', 'openapi.yml'));
-    expect(config.discovery).toEqual({ kind: 'file', file: path.join(APP_ROOT, 'discovery.local.json') });
   });
 
   it('applies defaults for timeout, body limit and port', () => {
@@ -67,33 +66,23 @@ describe('loadConfig', () => {
     );
   });
 
-  it('checks that GATEWAY_DISCOVERY_FILE exists', () => {
-    expect(() =>
-      loadConfig(env({ GATEWAY_PROJECT: 'demo', GATEWAY_DISCOVERY_FILE: '/nope/discovery.json' })),
-    ).toThrow(/Discovery file not found/);
-  });
-
-  describe('discovery source', () => {
-    const noFile = { GATEWAY_DISCOVERY_FILE: undefined };
-
-    it('requires exactly one of GATEWAY_DISCOVERY_FILE or GATEWAY_REGISTRY_URL', () => {
-      expect(() => loadConfig(env({ GATEWAY_PROJECT: 'demo', GATEWAY_DISCOVERY_FILE: '' }))).toThrow(
-        /Set GATEWAY_REGISTRY_URL .* or GATEWAY_DISCOVERY_FILE/,
+  describe('registry', () => {
+    it('requires GATEWAY_REGISTRY_URL', () => {
+      expect(() => loadConfig(env({ GATEWAY_PROJECT: 'demo', GATEWAY_REGISTRY_URL: undefined }))).toThrow(
+        /GATEWAY_REGISTRY_URL is required/,
       );
-      expect(() =>
-        loadConfig(env({ GATEWAY_PROJECT: 'demo', GATEWAY_REGISTRY_URL: 'http://localhost:8500' })),
-      ).toThrow(/Set only one of/);
+      expect(() => loadConfig(env({ GATEWAY_PROJECT: 'demo', GATEWAY_REGISTRY_URL: '  ' }))).toThrow(
+        /GATEWAY_REGISTRY_URL is required/,
+      );
     });
 
-    it('uses the registry with a default poll interval of 3s', () => {
-      const config = loadConfig(
-        env({ ...noFile, GATEWAY_PROJECT: 'demo', GATEWAY_REGISTRY_URL: 'http://localhost:8500/' }),
-      );
-      expect(config.discovery).toEqual({ kind: 'registry', url: 'http://localhost:8500', pollIntervalMs: 3_000 });
+    it('strips the trailing slash and defaults the poll interval to 3s', () => {
+      const config = loadConfig(env({ GATEWAY_PROJECT: 'demo', GATEWAY_REGISTRY_URL: 'http://localhost:8500/' }));
+      expect(config.discovery).toEqual({ url: 'http://localhost:8500', pollIntervalMs: 3_000 });
     });
 
     it('reads GATEWAY_REGISTRY_POLL_MS (max 60s)', () => {
-      const base = { ...noFile, GATEWAY_PROJECT: 'demo', GATEWAY_REGISTRY_URL: 'http://registry:8500' };
+      const base = { GATEWAY_PROJECT: 'demo', GATEWAY_REGISTRY_URL: 'http://registry:8500' };
       expect(loadConfig(env({ ...base, GATEWAY_REGISTRY_POLL_MS: '1000' })).discovery).toMatchObject({
         pollIntervalMs: 1_000,
       });
@@ -107,7 +96,7 @@ describe('loadConfig', () => {
       ['ftp://registry:8500', /must use http or https/],
       ['http://registry:8500?x=1', /must not contain a query/],
     ])('rejects GATEWAY_REGISTRY_URL=%p', (url, message) => {
-      expect(() => loadConfig(env({ ...noFile, GATEWAY_PROJECT: 'demo', GATEWAY_REGISTRY_URL: url }))).toThrow(message);
+      expect(() => loadConfig(env({ GATEWAY_PROJECT: 'demo', GATEWAY_REGISTRY_URL: url }))).toThrow(message);
     });
   });
 

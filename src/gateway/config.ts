@@ -11,7 +11,7 @@ export interface GatewayConfig {
   specsDir: string;
   /** Đường dẫn tuyệt đối tới file spec đã được kiểm tra là tồn tại. */
   specPath: string;
-  /** Nguồn danh sách instance: file tĩnh hoặc Service Registry. */
+  /** Service Registry: nguồn danh sách instance. */
   discovery: DiscoveryConfig;
   /** Thời gian tối đa chờ service trả lời (ms). Quá thì 504. */
   rpcTimeoutMs: number;
@@ -22,14 +22,12 @@ export interface GatewayConfig {
   port: number;
 }
 
-/**
- * Chọn ĐÚNG MỘT nguồn instance:
- * - `file`: StaticDiscovery, đọc JSON lúc khởi động (dev/test, không cần registry).
- * - `registry`: RegistryDiscovery, đồng bộ snapshot từ Service Registry ở nền.
- */
-export type DiscoveryConfig =
-  | { kind: 'file'; file: string }
-  | { kind: 'registry'; url: string; pollIntervalMs: number };
+/** RegistryDiscovery đồng bộ snapshot từ Service Registry ở nền, mỗi `pollIntervalMs`. */
+export interface DiscoveryConfig {
+  /** URL gốc của registry, đã bỏ "/" cuối. */
+  url: string;
+  pollIntervalMs: number;
+}
 
 const DEFAULT_REGISTRY_POLL_MS = 3_000;
 const DEFAULT_SPECS_DIR = './specs';
@@ -88,7 +86,7 @@ export function loadConfig(
     );
   }
 
-  const discovery = loadDiscoveryConfig(env, cwd);
+  const discovery = loadDiscoveryConfig(env);
 
   return {
     project,
@@ -102,45 +100,29 @@ export function loadConfig(
   };
 }
 
-/** GATEWAY_DISCOVERY_FILE hoặc GATEWAY_REGISTRY_URL: phải có đúng một, không đoán hộ. */
-function loadDiscoveryConfig(env: NodeJS.ProcessEnv, cwd: string): DiscoveryConfig {
-  const fileEnv = env.GATEWAY_DISCOVERY_FILE?.trim();
+/** GATEWAY_REGISTRY_URL bắt buộc: gateway chỉ lấy instance từ Service Registry. */
+function loadDiscoveryConfig(env: NodeJS.ProcessEnv): DiscoveryConfig {
   const urlEnv = env.GATEWAY_REGISTRY_URL?.trim();
-
-  if (fileEnv && urlEnv) {
-    throw new ConfigError('Set only one of GATEWAY_DISCOVERY_FILE (static file) or GATEWAY_REGISTRY_URL (registry), not both.');
-  }
-  if (!fileEnv && !urlEnv) {
-    throw new ConfigError(
-      'Set GATEWAY_REGISTRY_URL (Service Registry, e.g. http://localhost:8500) or GATEWAY_DISCOVERY_FILE (static discovery JSON).',
-    );
+  if (!urlEnv) {
+    throw new ConfigError('GATEWAY_REGISTRY_URL is required (Service Registry, e.g. http://localhost:8500).');
   }
 
-  if (urlEnv) {
-    let url: URL;
-    try {
-      url = new URL(urlEnv);
-    } catch {
-      throw new ConfigError(`GATEWAY_REGISTRY_URL "${urlEnv}" is not a valid URL.`);
-    }
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-      throw new ConfigError(`GATEWAY_REGISTRY_URL must use http or https, got "${url.protocol}".`);
-    }
-    if (url.search || url.hash) {
-      throw new ConfigError('GATEWAY_REGISTRY_URL must not contain a query string or fragment.');
-    }
-    return {
-      kind: 'registry',
-      url: url.toString().replace(/\/+$/, ''),
-      pollIntervalMs: positiveInt(env, 'GATEWAY_REGISTRY_POLL_MS', DEFAULT_REGISTRY_POLL_MS, 60_000),
-    };
+  let url: URL;
+  try {
+    url = new URL(urlEnv);
+  } catch {
+    throw new ConfigError(`GATEWAY_REGISTRY_URL "${urlEnv}" is not a valid URL.`);
   }
-
-  const file = path.resolve(cwd, fileEnv!);
-  if (!existsSync(file) || !statSync(file).isFile()) {
-    throw new ConfigError(`Discovery file not found: ${file}`);
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new ConfigError(`GATEWAY_REGISTRY_URL must use http or https, got "${url.protocol}".`);
   }
-  return { kind: 'file', file };
+  if (url.search || url.hash) {
+    throw new ConfigError('GATEWAY_REGISTRY_URL must not contain a query string or fragment.');
+  }
+  return {
+    url: url.toString().replace(/\/+$/, ''),
+    pollIntervalMs: positiveInt(env, 'GATEWAY_REGISTRY_POLL_MS', DEFAULT_REGISTRY_POLL_MS, 60_000),
+  };
 }
 
 /** Đọc số nguyên dương từ env; sai định dạng thì báo lỗi thay vì âm thầm dùng NaN. */

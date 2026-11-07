@@ -3,7 +3,7 @@ import type { Instance, ServiceDiscovery } from './types';
 /**
  * Discovery động: đồng bộ SNAPSHOT của project từ Service Registry ở nền.
  *
- *   timer nền ──GET /v1/projects/:project/snapshot (If-None-Match)──► registry
+ *   timer nền ──GET /v1/snapshot (If-None-Match)──► registry
  *                ◄── 200 + bảng mới  |  304 không đổi  |  lỗi → giữ bảng cũ
  *   request  ──resolve(pattern)──► chỉ đọc RAM, KHÔNG BAO GIỜ chờ registry
  *
@@ -23,7 +23,6 @@ export interface RegistryDiscoveryLogger {
 export interface RegistryDiscoveryOptions {
   /** VD "http://localhost:8500". */
   registryUrl: string;
-  project: string;
   pollIntervalMs: number;
   /** Thời gian chờ tối đa một lần gọi registry. Mặc định 2000ms. */
   requestTimeoutMs?: number;
@@ -43,7 +42,7 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 2_000;
 const silent: RegistryDiscoveryLogger = { warn: () => undefined };
 
 export class RegistryDiscovery implements ServiceDiscovery {
-  /** pattern → instances của project này. Thay NGUYÊN bảng mỗi lần đổi (atomic swap), không sửa tại chỗ. */
+  /** pattern → instances. Thay NGUYÊN bảng mỗi lần đổi (atomic swap), không sửa tại chỗ. */
   private table = new Map<string, Instance[]>();
   private etag?: string;
   private version?: number;
@@ -59,7 +58,7 @@ export class RegistryDiscovery implements ServiceDiscovery {
 
   constructor(private readonly options: RegistryDiscoveryOptions) {
     const base = options.registryUrl.replace(/\/+$/, '');
-    this.snapshotUrl = `${base}/v1/projects/${encodeURIComponent(options.project)}/snapshot`;
+    this.snapshotUrl = `${base}/v1/snapshot`;
     this.fetchFn = options.fetch ?? fetch;
     this.logger = options.logger ?? silent;
   }
@@ -111,8 +110,7 @@ export class RegistryDiscovery implements ServiceDiscovery {
     return 'changed';
   }
 
-  async resolve(project: string, pattern: string): Promise<Instance[]> {
-    if (project !== this.options.project) return [];
+  async resolve(pattern: string): Promise<Instance[]> {
     // Bản copy: nơi gọi (load balancer) không sửa được bảng bên trong.
     return [...(this.table.get(pattern) ?? [])];
   }

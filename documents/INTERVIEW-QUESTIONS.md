@@ -217,7 +217,7 @@ Phỏng vấn viên sẽ hỏi "vì sao" cho mọi quyết định. Trả lời 
 - [ ] 🔴 **Pattern trong spec nhưng chưa service nào đăng ký: phát hiện lúc nào? Cải thiện ra sao?**
   *Ý chính:* lúc request (503) + cảnh báo khi khởi động (`unservedPatterns`); có thể log định kỳ. · 📚 #7
 - [ ] 🔴 **Hai service đăng ký cùng một pattern thì sao?**
-  *Ý chính:* registry/StaticDiscovery từ chối; nếu cho phép thì gateway không biết gửi ai. · 📚 #7
+  *Ý chính:* registry từ chối (409); nếu cho phép thì gateway không biết gửi ai. · 📚 #7
 - [ ] 🟡 **Vì sao chọn TCP thay vì HTTP proxy hay RabbitMQ RPC?**
   *Ý chính:* nhanh, trực tiếp, registry có vai trò thật; RMQ RPC phụ thuộc broker; HTTP proxy không khớp ý tưởng message pattern. · 📚 #6
 - [ ] 🟡 **Message RPC không có HTTP status, gateway trả 201/204 bằng cách nào?**

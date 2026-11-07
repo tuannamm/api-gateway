@@ -1,6 +1,6 @@
 /**
  * Ranh giới giữa gateway và Service Registry (project riêng).
- * Gateway chỉ biết interface này; StaticDiscovery (file) hoặc RegistryDiscovery (registry thật)
+ * Gateway chỉ biết interface này; cài đặt là RegistryDiscovery, test dùng bản giả
  * (Dependency Inversion: code cấp cao phụ thuộc abstraction, không phụ thuộc cài đặt cụ thể).
  */
 
@@ -15,10 +15,13 @@ export interface Instance {
 
 export interface ServiceDiscovery {
   /**
-   * Instance healthy đang xử lý `pattern` (= operationId) trong `project`.
+   * Instance healthy đang xử lý `pattern` (= operationId).
    * Mảng rỗng nghĩa là chưa có ai xử lý → gateway trả 503.
+   *
+   * Không có tham số project: mỗi registry phục vụ đúng MỘT project
+   * application, và mỗi gateway chỉ nói chuyện với registry của project mình.
    */
-  resolve(project: string, pattern: string): Promise<Instance[]>;
-  /** Giải phóng tài nguyên (timer poll...) khi gateway tắt. Discovery tĩnh không cần. */
+  resolve(pattern: string): Promise<Instance[]>;
+  /** Giải phóng tài nguyên (timer poll...) khi gateway tắt. Bản giả trong test có thể bỏ qua. */
   close?(): void;
 }
