@@ -34,6 +34,7 @@ describe('loadSpec', () => {
       path: '/users/{id}',
       operationId: 'user.getById',
       successStatus: 200,
+      requiresAuth: false,
     });
     expect(spec.routes).toContainEqual(
       expect.objectContaining({ path: '/users/{userId}/orders', operationId: 'listOrdersOfUser' }),

@@ -1,0 +1,11 @@
+{
+  "name": "api-gateway",
+  "root": ".",
+  "targets": {
+    "build": { "command": "npm run build" },
+    "test": { "command": "npm test -- --runInBand" },
+    "test:e2e": { "command": "npm run test:e2e -- --runInBand" },
+    "lint": { "command": "npm run lint" },
+    "typecheck": { "command": "tsc --noEmit" }
+  }
+}

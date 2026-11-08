@@ -1,3 +1,4 @@
+import { types } from 'node:util';
 import { ClientProxyFactory, Transport, type ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom, timeout, TimeoutError } from 'rxjs';
 import type { Instance } from '../discovery/types';
@@ -104,7 +105,7 @@ export class TcpTransport implements RpcTransport {
 
 /** Phân loại lỗi kết nối; undefined nghĩa là không phải lỗi kết nối. */
 function classifyConnectionError(error: unknown): 'not-delivered' | 'maybe-delivered' | undefined {
-  if (!(error instanceof Error)) return undefined;
+  if (!types.isNativeError(error)) return undefined;
   const code = (error as NodeJS.ErrnoException).code;
   if (code !== undefined && NOT_DELIVERED_CODES.has(code)) return 'not-delivered';
   if (code !== undefined && MAYBE_DELIVERED_CODES.has(code)) return 'maybe-delivered';

@@ -33,6 +33,8 @@ export interface RouteDefinition {
   operationId: string;
   /** HTTP status trả về khi service xử lý thành công (lấy từ `responses` trong spec). */
   successStatus: number;
+  /** Secure by default when omitted. */
+  requiresAuth?: boolean;
 }
 
 /**

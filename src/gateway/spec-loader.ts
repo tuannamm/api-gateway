@@ -55,6 +55,22 @@ export function extractRoutes(
   }
 
   const issues: string[] = [];
+  for (const [name, scheme] of Object.entries(api.components?.securitySchemes ?? {})) {
+    if (!('type' in scheme) || scheme.type !== 'http' || scheme.scheme.toLowerCase() !== 'bearer') {
+      issues.push(`Unsupported security scheme: ${name}`);
+    }
+  }
+  const validateSecurity = (security: OpenAPIV3.SecurityRequirementObject[] | undefined) => {
+    if (!security) return;
+    for (const requirement of security) {
+      const names = Object.keys(requirement);
+      if (names.length !== 1 || names.some(name => !api.components?.securitySchemes?.[name] || requirement[name].length !== 0)) {
+        issues.push('Only bearer security requirements with empty scopes are supported');
+      }
+    }
+  };
+  validateSecurity(api.security);
+
   const routes: RouteDefinition[] = [];
   const operationIds = new Map<string, string>(); // operationId → nơi khai báo đầu tiên
   const shapes = new Map<string, string>(); // "get /users/{}" → path gốc
@@ -67,6 +83,7 @@ export function extractRoutes(
       const operation = pathItem[method] as OpenAPIV3.OperationObject | undefined;
       if (!operation) continue;
 
+      validateSecurity(operation.security);
       const where = `${method.toUpperCase()} ${pathTemplate}`;
       const operationId = operation.operationId;
 
@@ -106,6 +123,7 @@ export function extractRoutes(
         path: pathTemplate,
         operationId,
         successStatus: pickSuccessStatus(operation.responses),
+        requiresAuth: operation.security?.length === 0 || (operation.security === undefined && api.security?.length === 0) ? false : true,
       });
     }
   }

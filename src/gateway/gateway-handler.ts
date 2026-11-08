@@ -1,3 +1,4 @@
+import type { Authenticator } from './auth/jwt-authenticator';
 import type { GatewayRequest } from './contracts';
 import type { Instance, ServiceDiscovery } from './discovery/types';
 import type { LoadBalancer } from './load-balancer';
@@ -45,6 +46,7 @@ export interface GatewayLogger {
 
 export interface GatewayHandlerOptions {
   project: string;
+  authenticator?: Authenticator;
   routeTable: RouteTable;
   discovery: ServiceDiscovery;
   transport: RpcTransport;
@@ -64,6 +66,11 @@ export class GatewayHandler {
 
   constructor(private readonly options: GatewayHandlerOptions) {
     this.logger = options.logger ?? silentLogger;
+  }
+
+  private async authenticate(header: string | string[] | undefined) {
+    if (!this.options.authenticator) throw new GatewayError(503, 'AUTH_UNAVAILABLE', 'Authentication is not configured');
+    return this.options.authenticator.authenticate(header);
   }
 
   async handle(request: IncomingRequest): Promise<OutgoingResponse> {
@@ -88,10 +95,15 @@ export class GatewayHandler {
       }
       const { route, params } = match;
 
+      const user = route.requiresAuth !== false
+        ? await this.authenticate(request.headers.authorization)
+        : undefined;
+
       // 2. Payload: dựng từ đầu, chỉ những gì hợp đồng cho phép (allowlist).
       const payload: GatewayRequest = {
         params,
         query,
+        ...(user && { user }),
         ...(request.body !== undefined && { body: request.body }),
         meta: {
           requestId,

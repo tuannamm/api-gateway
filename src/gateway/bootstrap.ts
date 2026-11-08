@@ -1,3 +1,5 @@
+import { JwtAuthenticator } from './auth/jwt-authenticator';
+import { ConfigError } from './errors';
 import type { GatewayConfig } from './config';
 import { RegistryDiscovery } from './discovery/registry-discovery';
 import type { ServiceDiscovery } from './discovery/types';
@@ -25,6 +27,7 @@ export interface Gateway {
 
 export async function buildGateway(config: GatewayConfig, logger?: GatewayLogger): Promise<Gateway> {
   const spec = await loadSpec(config.specPath);
+  if (spec.routes.some(r => r.requiresAuth !== false) && !config.auth) throw new ConfigError('Protected routes require KEYCLOAK_ISSUER and KEYCLOAK_AUDIENCE');
   const routeTable = RouteTable.from(spec.routes);
   const transport = new TcpTransport();
   const specPatterns = spec.routes.map((r) => r.operationId);
@@ -48,6 +51,7 @@ export async function buildGateway(config: GatewayConfig, logger?: GatewayLogger
 
   const handler = new GatewayHandler({
     project: config.project,
+    authenticator: config.auth ? new JwtAuthenticator(config.auth.issuer, config.auth.audience) : undefined,
     routeTable,
     discovery,
     transport,

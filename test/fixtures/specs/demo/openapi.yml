@@ -3,6 +3,7 @@ openapi: 3.0.3
 info:
   title: Demo
   version: 1.0.0
+security: []
 paths:
   /users:
     get:

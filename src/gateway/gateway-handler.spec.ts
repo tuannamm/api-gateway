@@ -15,10 +15,10 @@ import type { RouteDefinition } from './types';
 const instance: Instance = { id: 'user-1', service: 'user', host: '127.0.0.1', port: 4001 };
 
 const routes: RouteDefinition[] = [
-  { method: 'get', path: '/users/{id}', operationId: 'user.getById', successStatus: 200 },
-  { method: 'post', path: '/users', operationId: 'user.create', successStatus: 201 },
-  { method: 'delete', path: '/users/{id}', operationId: 'user.remove', successStatus: 204 },
-  { method: 'get', path: '/orphans', operationId: 'orphan.list', successStatus: 200 },
+  { method: 'get', path: '/users/{id}', operationId: 'user.getById', successStatus: 200, requiresAuth: false },
+  { method: 'post', path: '/users', operationId: 'user.create', successStatus: 201, requiresAuth: false },
+  { method: 'delete', path: '/users/{id}', operationId: 'user.remove', successStatus: 204, requiresAuth: false },
+  { method: 'get', path: '/orphans', operationId: 'orphan.list', successStatus: 200, requiresAuth: false },
 ];
 
 type Behaviour = (pattern: string, payload: GatewayRequest, instance: Instance) => unknown;

@@ -7,6 +7,7 @@ import { ConfigError } from './errors';
  * chọn bằng GATEWAY_PROJECT. Spec nằm ở <GATEWAY_SPECS_DIR>/<project>/<GATEWAY_SPEC_FILE>.
  */
 export interface GatewayConfig {
+  auth?: { issuer: string; audience: string };
   project: string;
   specsDir: string;
   /** Đường dẫn tuyệt đối tới file spec đã được kiểm tra là tồn tại. */
@@ -90,6 +91,7 @@ export function loadConfig(
 
   return {
     project,
+    auth: loadAuthConfig(env),
     specsDir,
     specPath,
     discovery,
@@ -155,4 +157,13 @@ function describeAvailableProjects(specsDir: string): string {
 function isInside(parent: string, child: string): boolean {
   const relative = path.relative(parent, child);
   return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+}
+
+function loadAuthConfig(env: NodeJS.ProcessEnv): GatewayConfig['auth'] {
+  if (!env.KEYCLOAK_ISSUER && !env.KEYCLOAK_AUDIENCE) return undefined;
+  if (!env.KEYCLOAK_ISSUER || !env.KEYCLOAK_AUDIENCE) throw new ConfigError('KEYCLOAK_ISSUER and KEYCLOAK_AUDIENCE must be configured together');
+  let url: URL;
+  try { url = new URL(env.KEYCLOAK_ISSUER); } catch { throw new ConfigError('KEYCLOAK_ISSUER must be a URL'); }
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) throw new ConfigError('Invalid KEYCLOAK_ISSUER');
+  return { issuer: env.KEYCLOAK_ISSUER.replace(/\/+$/, ''), audience: env.KEYCLOAK_AUDIENCE };
 }
