@@ -80,3 +80,11 @@ curl -i -X POST localhost:3000/auth/logout           # 503 NO_INSTANCE
 npm exec nx test api-gateway                 # unit + integration
 npm exec nx run api-gateway:test:e2e         # e2e: HTTP → gateway → TCP → microservice
 ```
+
+## Tích hợp w-identity
+
+Copy `.env.identity.example` thành `.env` để dùng project `identity` (HTTP 3000, registry 8500). Cấu hình `KEYCLOAK_ISSUER` đúng issuer mà token chứa và `KEYCLOAK_AUDIENCE=w-identity`. Realm fixture và hướng dẫn nằm ở `apps/w-identity/README.md`.
+
+Gateway mặc định yêu cầu bearer JWT trên mỗi route; chỉ `security: []` mới công khai. Gateway kiểm tra chữ ký RS256/JWKS, issuer, audience, thời hạn và loại access token trước khi truyền `sub`, `iss`, realm roles xuống TCP. Khi spec có route bảo vệ mà chưa cấu hình issuer/audience, gateway dừng lúc khởi động. Spec ví dụ cũ cũng cần cấu hình xác thực cho các route bảo vệ.
+
+Repo này có Nx config riêng vì bị loại khỏi graph của workspace root. Chạy build/test trong thư mục `apps/api-gateway` bằng `npm exec nx run api-gateway:build`, `npm exec nx run api-gateway:test`, `npm exec nx run api-gateway:test:e2e`. Test dùng Node 24 và VM modules theo npm script. Spec identity có request/response schemas; service vẫn thực hiện validation đầu vào và kiểm tra quyền nghiệp vụ.
