@@ -37,6 +37,21 @@ describe('loadConfig', () => {
     });
   });
 
+  it('disables CORS by default and parses GATEWAY_CORS_ORIGINS as exact origins', () => {
+    expect(loadConfig(env({ GATEWAY_PROJECT: 'demo' })).corsOrigins).toEqual([]);
+    expect(
+      loadConfig(env({ GATEWAY_PROJECT: 'demo', GATEWAY_CORS_ORIGINS: 'http://localhost:3001, https://app.example.com' }))
+        .corsOrigins,
+    ).toEqual(['http://localhost:3001', 'https://app.example.com']);
+  });
+
+  it.each(['*', 'localhost:3001', 'http://localhost:3001/app', 'http://localhost:3001/', 'ftp://host', 'not a url'])(
+    'rejects GATEWAY_CORS_ORIGINS entry %p',
+    (value) => {
+      expect(() => loadConfig(env({ GATEWAY_PROJECT: 'demo', GATEWAY_CORS_ORIGINS: value }))).toThrow(/GATEWAY_CORS_ORIGINS/);
+    },
+  );
+
   it('reads GATEWAY_FAILOVER_MAX_ATTEMPTS (1 disables failover, max 10)', () => {
     expect(loadConfig(env({ GATEWAY_PROJECT: 'demo', GATEWAY_FAILOVER_MAX_ATTEMPTS: '1' })).failoverMaxAttempts).toBe(1);
     expect(() => loadConfig(env({ GATEWAY_PROJECT: 'demo', GATEWAY_FAILOVER_MAX_ATTEMPTS: '0' }))).toThrow(

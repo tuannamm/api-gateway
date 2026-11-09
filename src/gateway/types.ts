@@ -35,6 +35,13 @@ export interface RouteDefinition {
   successStatus: number;
   /** Secure by default when omitted. */
   requiresAuth?: boolean;
+  /**
+   * Permission (dạng `resource:action`) mà người gọi PHẢI có đủ tất cả (AND), lấy từ
+   * `x-required-permissions` trong spec. Mảng rỗng = chỉ cần đăng nhập.
+   * SpecLoader bắt buộc khai báo cho mọi route cần đăng nhập, nên thiếu ở đây chỉ xảy ra khi
+   * dựng RouteDefinition bằng tay (test); handler coi thiếu là không yêu cầu permission.
+   */
+  permissions?: readonly string[];
 }
 
 /**

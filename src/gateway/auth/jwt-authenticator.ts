@@ -14,9 +14,8 @@ export class JwtAuthenticator implements Authenticator {
         issuer: this.issuer, audience: this.audience, algorithms: ['RS256'], requiredClaims: ['sub', 'exp', 'iat'],
       });
       if (typeof payload.sub !== 'string' || !payload.sub || payload.typ !== 'Bearer') throw unauthorized();
-      const access = payload.realm_access as { roles?: unknown } | undefined;
-      const roles = Array.isArray(access?.roles) ? access.roles.filter((r): r is string => typeof r === 'string') : [];
-      return { sub: payload.sub, iss: payload.iss, roles };
+      // Chủ ý KHÔNG đọc realm_access.roles: role/permission nằm ở w-identity, không tin claim trong token.
+      return { sub: payload.sub, iss: payload.iss };
     } catch { throw unauthorized(); }
   }
 }

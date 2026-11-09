@@ -48,24 +48,13 @@
           },
           "emailVerified": {
             "type": "boolean"
-          },
-          "roles": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "admin",
-                "user"
-              ]
-            }
           }
         },
         "required": [
           "userId",
           "username",
           "enabled",
-          "emailVerified",
-          "roles"
+          "emailVerified"
         ]
       },
       "CreateUser": {
@@ -231,21 +220,19 @@
           "emailVerified": {
             "type": "boolean"
           },
-          "roles": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "admin",
-                "user"
-              ]
-            }
-          },
           "profile": {
             "description": "Null until the first profile update; reading does not create a profile.",
             "anyOf": [
-              { "$ref": "#/components/schemas/UserProfile" },
-              { "type": "object", "nullable": true, "enum": [null] }
+              {
+                "$ref": "#/components/schemas/UserProfile"
+              },
+              {
+                "type": "object",
+                "nullable": true,
+                "enum": [
+                  null
+                ]
+              }
             ]
           }
         },
@@ -254,7 +241,6 @@
           "username",
           "enabled",
           "emailVerified",
-          "roles",
           "profile"
         ]
       },
@@ -282,25 +268,6 @@
           "items",
           "offset",
           "limit"
-        ]
-      },
-      "Roles": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "admin",
-                "user"
-              ]
-            }
-          }
-        },
-        "required": [
-          "items"
         ]
       },
       "Status": {
@@ -335,6 +302,227 @@
             "additionalProperties": true
           }
         }
+      },
+      "Role": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "permissionKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "system": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "permissionKeys",
+          "system",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "Permission": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateRole": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "permissionKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateRole": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "description"
+        ]
+      },
+      "CreatePermission": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ]
+      },
+      "AssignRole": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "roleName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "roleName"
+        ]
+      },
+      "GrantPermission": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "permissionKey": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "permissionKey"
+        ]
+      },
+      "Access": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "userId",
+          "role",
+          "permissions"
+        ]
+      },
+      "UserRole": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          }
+        },
+        "required": [
+          "userId",
+          "role"
+        ]
+      },
+      "UserPermissions": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "roleName": {
+            "type": "string"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "userId",
+          "roleName",
+          "permissions"
+        ]
+      },
+      "RoleList": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Role"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "PermissionList": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Permission"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
       }
     }
   },
@@ -465,6 +653,9 @@
               "default": 20
             }
           }
+        ],
+        "x-required-permissions": [
+          "users:read"
         ]
       },
       "post": {
@@ -560,7 +751,10 @@
               }
             }
           }
-        }
+        },
+        "x-required-permissions": [
+          "users:write"
+        ]
       }
     },
     "/users/{id}": {
@@ -657,7 +851,10 @@
               }
             }
           }
-        }
+        },
+        "x-required-permissions": [
+          "users:read"
+        ]
       },
       "patch": {
         "operationId": "identity.users.update",
@@ -745,7 +942,10 @@
               }
             }
           }
-        }
+        },
+        "x-required-permissions": [
+          "users:write"
+        ]
       }
     },
     "/users/{id}/status": {
@@ -845,274 +1045,10 @@
               }
             }
           }
-        }
-      }
-    },
-    "/roles": {
-      "get": {
-        "operationId": "identity.roles.list",
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Roles"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid input",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthenticated",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Dependency unavailable",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "User not found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Account conflict",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Partial failure or uncertain operation result",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/users/{id}/roles/{role}": {
-      "parameters": [
-        {
-          "name": "id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "string"
-          }
         },
-        {
-          "name": "role",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "string",
-            "enum": [
-              "admin",
-              "user"
-            ]
-          }
-        }
-      ],
-      "put": {
-        "operationId": "identity.users.assignRole",
-        "responses": {
-          "204": {
-            "description": "Success"
-          },
-          "400": {
-            "description": "Invalid input",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthenticated",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Dependency unavailable",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "User not found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Account conflict",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Partial failure or uncertain operation result",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "operationId": "identity.users.removeRole",
-        "responses": {
-          "204": {
-            "description": "Success"
-          },
-          "400": {
-            "description": "Invalid input",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthenticated",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Dependency unavailable",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "User not found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Account conflict",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Partial failure or uncertain operation result",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
+        "x-required-permissions": [
+          "users:write"
+        ]
       }
     },
     "/users/{id}/password-reset-email": {
@@ -1202,7 +1138,10 @@
               }
             }
           }
-        }
+        },
+        "x-required-permissions": [
+          "users:write"
+        ]
       }
     },
     "/me": {
@@ -1289,7 +1228,8 @@
               }
             }
           }
-        }
+        },
+        "x-required-permissions": []
       },
       "patch": {
         "operationId": "identity.me.updateProfile",
@@ -1383,6 +1323,390 @@
                 "$ref": "#/components/schemas/ProfilePatch"
               }
             }
+          }
+        },
+        "x-required-permissions": []
+      }
+    },
+    "/me/permissions": {
+      "get": {
+        "operationId": "identity.me.permissions",
+        "x-required-permissions": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Access"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{id}/role": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "identity.users.getRole",
+        "x-required-permissions": [
+          "users:read"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserRole"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "identity.users.assignRole",
+        "x-required-permissions": [
+          "roles:write"
+        ],
+        "responses": {
+          "204": {
+            "description": "Success"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignRole"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{id}/permissions": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "identity.users.getPermissions",
+        "x-required-permissions": [
+          "users:read"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserPermissions"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roles": {
+      "get": {
+        "operationId": "identity.roles.list",
+        "x-required-permissions": [
+          "roles:read"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleList"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "identity.roles.create",
+        "x-required-permissions": [
+          "roles:write"
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Role"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRole"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roles/{name}": {
+      "parameters": [
+        {
+          "name": "name",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "identity.roles.get",
+        "x-required-permissions": [
+          "roles:read"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Role"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "identity.roles.update",
+        "x-required-permissions": [
+          "roles:write"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Role"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRole"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "identity.roles.delete",
+        "x-required-permissions": [
+          "roles:write"
+        ],
+        "responses": {
+          "204": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/roles/{name}/permissions": {
+      "parameters": [
+        {
+          "name": "name",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "identity.roles.grantPermission",
+        "x-required-permissions": [
+          "roles:write"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Role"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantPermission"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roles/{name}/permissions/{key}": {
+      "parameters": [
+        {
+          "name": "name",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "key",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "delete": {
+        "operationId": "identity.roles.revokePermission",
+        "x-required-permissions": [
+          "roles:write"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Role"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/permissions": {
+      "get": {
+        "operationId": "identity.permissions.list",
+        "x-required-permissions": [
+          "permissions:read"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionList"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "identity.permissions.create",
+        "x-required-permissions": [
+          "permissions:write"
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Permission"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePermission"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/permissions/{key}": {
+      "parameters": [
+        {
+          "name": "key",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "identity.permissions.get",
+        "x-required-permissions": [
+          "permissions:read"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Permission"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "identity.permissions.delete",
+        "x-required-permissions": [
+          "permissions:write"
+        ],
+        "responses": {
+          "204": {
+            "description": "Success"
           }
         }
       }

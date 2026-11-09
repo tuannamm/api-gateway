@@ -15,7 +15,7 @@
 /** Danh tính người gọi, gateway lấy từ JWT đã verify (Bước 4). */
 export interface GatewayUser {
   sub: string;
-  roles: string[];
+  /** Gateway KHÔNG đưa role/permission từ JWT xuống service: quyền do w-identity quyết định (xem PermissionResolver). */
   [claim: string]: unknown;
 }
 

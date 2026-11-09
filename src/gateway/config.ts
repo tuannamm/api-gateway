@@ -20,6 +20,10 @@ export interface GatewayConfig {
   bodyLimit: number;
   /** Số instance tối đa được thử cho một request khi failover (1 = tắt failover). */
   failoverMaxAttempts: number;
+  /** Origin được phép gọi từ trình duyệt (CORS). Rỗng = tắt. */
+  corsOrigins: string[];
+  /** Cache permission của user (xem CachingPermissionResolver). */
+  authz: { cacheTtlMs: number; cacheMaxEntries: number };
   port: number;
 }
 
@@ -37,6 +41,8 @@ const DEFAULT_RPC_TIMEOUT_MS = 10_000;
 const DEFAULT_BODY_LIMIT = 1024 * 1024; // 1 MB
 const DEFAULT_FAILOVER_MAX_ATTEMPTS = 3;
 const DEFAULT_PORT = 3000;
+const DEFAULT_AUTHZ_CACHE_TTL_MS = 30_000;
+const DEFAULT_AUTHZ_CACHE_MAX_ENTRIES = 10_000;
 
 /** Chỉ chữ thường, số, `_`, `-`. Không có `/`, `.` nên không thể viết `../`. */
 const PROJECT_NAME = /^[a-z0-9_-]+$/;
@@ -98,6 +104,11 @@ export function loadConfig(
     rpcTimeoutMs: positiveInt(env, 'GATEWAY_RPC_TIMEOUT_MS', DEFAULT_RPC_TIMEOUT_MS),
     bodyLimit: positiveInt(env, 'GATEWAY_BODY_LIMIT', DEFAULT_BODY_LIMIT),
     failoverMaxAttempts: positiveInt(env, 'GATEWAY_FAILOVER_MAX_ATTEMPTS', DEFAULT_FAILOVER_MAX_ATTEMPTS, 10),
+    corsOrigins: loadCorsOrigins(env),
+    authz: {
+      cacheTtlMs: positiveInt(env, 'AUTHZ_CACHE_TTL_MS', DEFAULT_AUTHZ_CACHE_TTL_MS, 3_600_000),
+      cacheMaxEntries: positiveInt(env, 'AUTHZ_CACHE_MAX_ENTRIES', DEFAULT_AUTHZ_CACHE_MAX_ENTRIES, 1_000_000),
+    },
     port: positiveInt(env, 'PORT', DEFAULT_PORT, 65_535),
   };
 }
@@ -166,4 +177,28 @@ function loadAuthConfig(env: NodeJS.ProcessEnv): GatewayConfig['auth'] {
   try { url = new URL(env.KEYCLOAK_ISSUER); } catch { throw new ConfigError('KEYCLOAK_ISSUER must be a URL'); }
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) throw new ConfigError('Invalid KEYCLOAK_ISSUER');
   return { issuer: env.KEYCLOAK_ISSUER.replace(/\/+$/, ''), audience: env.KEYCLOAK_AUDIENCE };
+}
+
+/**
+ * GATEWAY_CORS_ORIGINS: danh sách origin cách nhau bằng dấu phẩy, ví dụ `http://localhost:3000`.
+ * Chỉ nhận origin chính xác (scheme://host[:port], không path); cấm `*` vì gateway dùng Authorization.
+ */
+function loadCorsOrigins(env: NodeJS.ProcessEnv): string[] {
+  const raw = env.GATEWAY_CORS_ORIGINS?.trim();
+  if (!raw) return [];
+  return raw.split(',').map((item) => {
+    const value = item.trim();
+    let url: URL;
+    try {
+      url = new URL(value);
+    } catch {
+      throw new ConfigError(`GATEWAY_CORS_ORIGINS contains an invalid origin: "${value}".`);
+    }
+    if (!['http:', 'https:'].includes(url.protocol) || url.origin !== value) {
+      throw new ConfigError(
+        `GATEWAY_CORS_ORIGINS entries must be exact origins like "http://localhost:3000" (got "${value}").`,
+      );
+    }
+    return url.origin;
+  });
 }

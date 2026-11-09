@@ -9,6 +9,8 @@
 #     vào Service Registry; gateway hỏi registry "ai xử lý pattern này?".
 #   - Mã 2xx nhỏ nhất trong `responses` là HTTP status khi service xử lý thành công.
 #   - security: [] đánh dấu route công khai (không cần token).
+#   - Route cần token BẮT BUỘC khai báo `x-required-permissions` (mảng `resource:action`, phải có đủ tất cả).
+#     Dùng `[]` nếu chỉ cần đăng nhập. Route công khai KHÔNG được khai báo. Thiếu khai báo thì gateway không khởi động.
 openapi: 3.0.3
 info:
   title: Example project
@@ -36,16 +38,19 @@ paths:
   /auth/logout:
     post:
       operationId: auth.logout
+      x-required-permissions: []
       responses:
         '204': { description: Logged out }
 
   /users:
     get:
       operationId: user.list
+      x-required-permissions: ['users:read']
       responses:
         '200': { description: List users }
     post:
       operationId: user.create
+      x-required-permissions: ['users:write']
       responses:
         '201': { description: Created }
 
@@ -54,6 +59,7 @@ paths:
       - { name: id, in: path, required: true, schema: { type: string } }
     get:
       operationId: user.getById
+      x-required-permissions: ['users:read']
       responses:
         '200': { description: One user }
         '404': { description: Not found }

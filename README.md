@@ -66,6 +66,9 @@ curl -i -X POST localhost:3000/auth/logout           # 503 NO_INSTANCE
 | `GATEWAY_BODY_LIMIT` | Không | `1048576` | Body tối đa, byte (413) |
 | `GATEWAY_FAILOVER_MAX_ATTEMPTS` | Không | `3` | Số instance tối đa thử cho một request (`1` = tắt failover) |
 | `PORT` | Không | `3000` | Cổng HTTP |
+| `GATEWAY_CORS_ORIGINS` | Không | (tắt) | Origin được phép gọi từ trình duyệt, cách nhau bằng dấu phẩy, đúng dạng `http://localhost:3001` (không path, không `*`). Preflight `OPTIONS` được trả lời trước bước xác thực; origin lạ nhận 403 |
+| `AUTHZ_CACHE_TTL_MS` | Không | `30000` | TTL cache permission của user |
+| `AUTHZ_CACHE_MAX_ENTRIES` | Không | `10000` | Số entry tối đa của cache permission |
 
 ## Thêm một project mới
 

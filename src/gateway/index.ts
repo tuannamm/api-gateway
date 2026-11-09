@@ -27,3 +27,9 @@ export {
   type HeaderMap,
 } from './gateway-handler';
 export { buildGateway, type Gateway } from './bootstrap';
+export {
+  AUTHZ_PATTERN,
+  CachingPermissionResolver,
+  RpcPermissionResolver,
+  type PermissionResolver,
+} from './auth/permission-resolver';

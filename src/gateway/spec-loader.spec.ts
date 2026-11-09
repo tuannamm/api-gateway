@@ -21,7 +21,7 @@ function doc(paths: Record<string, unknown>): OpenAPI.Document {
   return { openapi: '3.0.3', info: { title: 't', version: '1' }, paths } as OpenAPI.Document;
 }
 
-const ok = { responses: { '200': { description: 'OK' } } };
+const ok = { responses: { '200': { description: 'OK' } }, 'x-required-permissions': [] };
 
 describe('loadSpec', () => {
   it('accepts the identity contract with a nullable profile before its first update', async () => {
@@ -60,11 +60,12 @@ describe('loadSpec', () => {
   it('reports ALL gateway rule violations at once', async () => {
     const error = await expectSpecError(() => loadSpec(fixture('broken')));
 
-    expect(error.issues).toHaveLength(3);
+    expect(error.issues).toHaveLength(4);
     expect(error.issues[0]).toMatch(/GET \/a: missing operationId/);
     expect(error.issues[1]).toMatch(/GET \/b: operationId must not be empty/);
-    expect(error.issues[2]).toMatch(/POST \/c: duplicate operationId "shared.op"/);
-    expect(error.message).toContain('3 issue(s)');
+    expect(error.issues[2]).toMatch(/GET \/c: missing x-required-permissions/);
+    expect(error.issues[3]).toMatch(/POST \/c: duplicate operationId "shared.op"/);
+    expect(error.message).toContain('4 issue(s)');
   });
 
   it('rejects a document that is not valid OpenAPI', async () => {
@@ -133,6 +134,48 @@ describe('extractRoutes', () => {
   });
 });
 
+describe('x-required-permissions', () => {
+  const op = (extra: Record<string, unknown>) =>
+    extractRoutes(doc({ '/x': { get: { operationId: 'x.get', responses: ok.responses, ...extra } } }));
+
+  it('reads the permissions of a protected route', () => {
+    expect(op({ 'x-required-permissions': ['users:read', 'roles:write'] })[0].permissions).toEqual([
+      'users:read',
+      'roles:write',
+    ]);
+  });
+
+  it('accepts [] as "any authenticated user"', () => {
+    expect(op({ 'x-required-permissions': [] })[0].permissions).toEqual([]);
+  });
+
+  it('denies by default: a protected route without the extension is rejected', async () => {
+    const error = await expectSpecError(() => op({}));
+    expect(error.issues[0]).toMatch(/missing x-required-permissions/);
+  });
+
+  it('rejects the extension on a public route', async () => {
+    const error = await expectSpecError(() => op({ security: [], 'x-required-permissions': ['users:read'] }));
+    expect(error.issues[0]).toMatch(/public route/);
+    expect(op({ security: [] })[0].permissions).toBeUndefined();
+  });
+
+  it.each([
+    ['not an array', 'users:read'],
+    ['a non-string item', ['users:read', 1]],
+    ['a malformed key', ['users']],
+    ['an uppercase key', ['Users:Read']],
+  ])('rejects %s', async (_name, value) => {
+    const error = await expectSpecError(() => op({ 'x-required-permissions': value }));
+    expect(error.issues[0]).toMatch(/array of "resource:action" keys/);
+  });
+
+  it('rejects duplicate keys', async () => {
+    const error = await expectSpecError(() => op({ 'x-required-permissions': ['users:read', 'users:read'] }));
+    expect(error.issues[0]).toMatch(/duplicate/);
+  });
+});
+
 describe('pickSuccessStatus', () => {
   it.each([
     [{ '200': {}, '201': {} }, 200],
@@ -142,5 +185,14 @@ describe('pickSuccessStatus', () => {
     [undefined, 200],
   ])('%j → %i', (responses, expected) => {
     expect(pickSuccessStatus(responses as never)).toBe(expected);
+  });
+});
+
+describe('identity contract', () => {
+  it('loads all protected routes and keeps the internal lookup off HTTP', async () => {
+    const { routes } = await loadSpec(path.join(process.cwd(), 'specs/identity/openapi.yml'));
+    expect(routes.find((route) => route.operationId === 'identity.me.permissions')?.permissions).toEqual([]);
+    expect(routes.find((route) => route.operationId === 'identity.users.assignRole')?.permissions).toEqual(['roles:write']);
+    expect(routes.some((route) => route.operationId === 'identity.authz.permissions')).toBe(false);
   });
 });

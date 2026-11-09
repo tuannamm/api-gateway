@@ -118,18 +118,60 @@ export function extractRoutes(
       }
       shapes.set(shapeKey, pathTemplate);
 
+      const requiresAuth = !(operation.security?.length === 0 || (operation.security === undefined && api.security?.length === 0));
+      const permissions = readPermissions(operation, requiresAuth, where, issues);
+      if (permissions === 'invalid') continue;
+
       routes.push({
         method,
         path: pathTemplate,
         operationId,
         successStatus: pickSuccessStatus(operation.responses),
-        requiresAuth: operation.security?.length === 0 || (operation.security === undefined && api.security?.length === 0) ? false : true,
+        requiresAuth,
+        ...(permissions && { permissions }),
       });
     }
   }
 
   if (issues.length > 0) throw new SpecValidationError(specPath, issues);
   return routes;
+}
+
+const PERMISSION_KEY = /^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$/;
+export const PERMISSIONS_EXTENSION = 'x-required-permissions';
+
+/**
+ * Đọc `x-required-permissions`. Từ chối mặc định:
+ *   - route cần đăng nhập mà thiếu khai báo → lỗi (dùng `[]` nếu chỉ cần đăng nhập);
+ *   - route công khai mà có khai báo → lỗi (vô nghĩa, dễ nhầm là đã được bảo vệ);
+ *   - phải là mảng key `resource:action`, không trùng.
+ * Trả `undefined` cho route công khai, 'invalid' khi đã ghi lỗi vào `issues`.
+ */
+function readPermissions(
+  operation: OpenAPIV3.OperationObject,
+  requiresAuth: boolean,
+  where: string,
+  issues: string[],
+): string[] | undefined | 'invalid' {
+  const raw = (operation as Record<string, unknown>)[PERMISSIONS_EXTENSION];
+  if (!requiresAuth) {
+    if (raw === undefined) return undefined;
+    issues.push(`${where}: public route (security: []) must not declare ${PERMISSIONS_EXTENSION}.`);
+    return 'invalid';
+  }
+  if (raw === undefined) {
+    issues.push(`${where}: missing ${PERMISSIONS_EXTENSION} (use [] when any authenticated user may call it).`);
+    return 'invalid';
+  }
+  if (!Array.isArray(raw) || raw.some((key) => typeof key !== 'string' || !PERMISSION_KEY.test(key))) {
+    issues.push(`${where}: ${PERMISSIONS_EXTENSION} must be an array of "resource:action" keys.`);
+    return 'invalid';
+  }
+  if (new Set(raw).size !== raw.length) {
+    issues.push(`${where}: ${PERMISSIONS_EXTENSION} contains duplicate keys.`);
+    return 'invalid';
+  }
+  return [...raw] as string[];
 }
 
 /**

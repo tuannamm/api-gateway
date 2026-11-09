@@ -23,7 +23,7 @@ describe('Keycloak JWT verification', () => {
   const token = (overrides: Record<string, unknown> = {}, kid = 'one') => new SignJWT({ typ: 'Bearer', realm_access: { roles: ['admin'] }, ...overrides })
     .setProtectedHeader({ alg: 'RS256', kid }).setIssuer(issuer).setSubject('alice').setAudience('w-identity').setIssuedAt().setExpirationTime('5m');
   it('accepts verified claims only', async () => {
-    expect(await auth.authenticate(`Bearer ${await token().sign(key.privateKey)}`)).toEqual({ sub: 'alice', iss: issuer, roles: ['admin'] });
+    expect(await auth.authenticate(`Bearer ${await token().sign(key.privateKey)}`)).toEqual({ sub: 'alice', iss: issuer });
   });
   it('rejects missing, expired, wrong audience, issuer, signature and token type', async () => {
     await expect(auth.authenticate(undefined)).rejects.toMatchObject({ status: 401 });
@@ -54,7 +54,7 @@ describe('Keycloak JWT verification', () => {
 });
 
 describe('OpenAPI security', () => {
-  const doc = (security?: unknown) => ({ openapi: '3.0.3', info: { title: 'test', version: '1' }, paths: { '/me': { get: { operationId: 'me', responses: { '200': { description: 'ok' } }, ...(security !== undefined ? { security } : {}) } } } }) as OpenAPI.Document;
+  const doc = (security?: unknown) => ({ openapi: '3.0.3', info: { title: 'test', version: '1' }, paths: { '/me': { get: { operationId: 'me', ...(Array.isArray(security) && security.length === 0 ? {} : { 'x-required-permissions': [] }), responses: { '200': { description: 'ok' } }, ...(security !== undefined ? { security } : {}) } } } }) as OpenAPI.Document;
   it('defaults to protected and allows explicit public routes', () => {
     expect(extractRoutes(doc())[0].requiresAuth).toBe(true);
     expect(extractRoutes(doc([]))[0].requiresAuth).toBe(false);

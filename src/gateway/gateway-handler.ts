@@ -1,10 +1,12 @@
 import type { Authenticator } from './auth/jwt-authenticator';
-import type { GatewayRequest } from './contracts';
+import type { PermissionResolver } from './auth/permission-resolver';
+import type { GatewayRequest, GatewayUser } from './contracts';
 import type { Instance, ServiceDiscovery } from './discovery/types';
 import type { LoadBalancer } from './load-balancer';
 import { GatewayError, PROBLEM_CONTENT_TYPE, toProblem } from './problem';
 import { REQUEST_ID_HEADER, resolveRequestId } from './request-id';
 import type { RouteTable } from './route-table';
+import type { RouteDefinition } from './types';
 import {
   RpcConnectionError,
   RpcPatternNotHandledError,
@@ -47,6 +49,13 @@ export interface GatewayLogger {
 export interface GatewayHandlerOptions {
   project: string;
   authenticator?: Authenticator;
+  /**
+   * Các origin được phép gọi từ trình duyệt (CORS). Rỗng/không có = tắt CORS.
+   * Chỉ nhận origin chính xác (không có ký tự đại diện): gateway dùng header Authorization.
+   */
+  corsOrigins?: readonly string[];
+  /** Nguồn permission của user. Bắt buộc nếu có route khai báo x-required-permissions khác rỗng. */
+  permissionResolver?: PermissionResolver;
   routeTable: RouteTable;
   discovery: ServiceDiscovery;
   transport: RpcTransport;
@@ -59,13 +68,19 @@ export interface GatewayHandlerOptions {
 
 const JSON_CONTENT_TYPE = 'application/json; charset=utf-8';
 const MAX_IDEMPOTENCY_KEY_LENGTH = 255;
+const CORS_ALLOWED_METHODS = 'GET, POST, PUT, PATCH, DELETE';
+const CORS_ALLOWED_HEADERS = 'authorization, content-type, x-request-id, idempotency-key';
+const CORS_EXPOSED_HEADERS = 'x-request-id';
+const CORS_MAX_AGE_SECONDS = '600';
 const silentLogger: GatewayLogger = { warn: () => undefined, error: () => undefined };
 
 export class GatewayHandler {
   private readonly logger: GatewayLogger;
+  private readonly corsOrigins: ReadonlySet<string>;
 
   constructor(private readonly options: GatewayHandlerOptions) {
     this.logger = options.logger ?? silentLogger;
+    this.corsOrigins = new Set(options.corsOrigins ?? []);
   }
 
   private async authenticate(header: string | string[] | undefined) {
@@ -73,7 +88,81 @@ export class GatewayHandler {
     return this.options.authenticator.authenticate(header);
   }
 
+  /**
+   * Từ chối mặc định: thiếu bất kỳ permission nào → 403; không tra được → 503 (fail closed).
+   * Thông báo 403 không liệt kê permission cần thiết để không lộ cấu trúc phân quyền.
+   */
+  private async authorize(route: RouteDefinition, user: GatewayUser | undefined, requestId: string) {
+    const required = route.permissions ?? [];
+    if (required.length === 0) return;
+    const resolver = this.options.permissionResolver;
+    if (!user || !resolver) {
+      this.logger.error(`[${requestId}] "${route.operationId}" requires permissions but no resolver/user is available`);
+      throw new GatewayError(503, 'AUTHZ_UNAVAILABLE', 'Authorization is temporarily unavailable');
+    }
+    let granted: ReadonlySet<string>;
+    try {
+      granted = await resolver.permissionsOf(user.sub, requestId);
+    } catch (error) {
+      this.logger.error(`[${requestId}] permission lookup failed: ${(error as Error)?.message ?? String(error)}`);
+      throw new GatewayError(503, 'AUTHZ_UNAVAILABLE', 'Authorization is temporarily unavailable');
+    }
+    if (!required.every((key) => granted.has(key))) {
+      throw new GatewayError(403, 'FORBIDDEN', 'You do not have permission to perform this operation');
+    }
+  }
+
+  /**
+   * CORS nằm NGOÀI xác thực: preflight (OPTIONS) do trình duyệt tự gửi và KHÔNG mang token,
+   * nên phải trả lời trước bước authenticate. Origin lạ không nhận header CORS nào.
+   */
   async handle(request: IncomingRequest): Promise<OutgoingResponse> {
+    if (this.corsOrigins.size === 0) return this.dispatch(request);
+
+    const origin = firstHeader(request.headers.origin);
+    const allowed = origin !== undefined && this.corsOrigins.has(origin);
+    const isPreflight =
+      request.method.toUpperCase() === 'OPTIONS' &&
+      origin !== undefined &&
+      firstHeader(request.headers['access-control-request-method']) !== undefined;
+
+    if (isPreflight) {
+      const requestId = resolveRequestId(request.headers[REQUEST_ID_HEADER]);
+      if (!allowed) {
+        const error = new GatewayError(403, 'CORS_ORIGIN_NOT_ALLOWED', 'Origin is not allowed');
+        return {
+          status: 403,
+          headers: { 'content-type': PROBLEM_CONTENT_TYPE, [REQUEST_ID_HEADER]: requestId, vary: 'Origin' },
+          body: toProblem(error, requestId, new URL(request.url, 'http://gateway').pathname),
+        };
+      }
+      return {
+        status: 204,
+        headers: {
+          'access-control-allow-origin': origin,
+          'access-control-allow-methods': CORS_ALLOWED_METHODS,
+          'access-control-allow-headers': CORS_ALLOWED_HEADERS,
+          'access-control-max-age': CORS_MAX_AGE_SECONDS,
+          vary: 'Origin',
+        },
+      };
+    }
+
+    const response = await this.dispatch(request);
+    return {
+      ...response,
+      headers: {
+        ...response.headers,
+        vary: 'Origin',
+        ...(allowed && {
+          'access-control-allow-origin': origin,
+          'access-control-expose-headers': CORS_EXPOSED_HEADERS,
+        }),
+      },
+    };
+  }
+
+  private async dispatch(request: IncomingRequest): Promise<OutgoingResponse> {
     const requestId = resolveRequestId(request.headers[REQUEST_ID_HEADER]);
     const { pathname, query } = parseUrl(request.url);
 
@@ -98,6 +187,9 @@ export class GatewayHandler {
       const user = route.requiresAuth !== false
         ? await this.authenticate(request.headers.authorization)
         : undefined;
+
+      // Phân quyền: permission lấy từ nguồn tin cậy theo user.sub, KHÔNG bao giờ từ request.
+      await this.authorize(route, user, requestId);
 
       // 2. Payload: dựng từ đầu, chỉ những gì hợp đồng cho phép (allowlist).
       const payload: GatewayRequest = {
@@ -258,4 +350,8 @@ function safeStringify(value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+function firstHeader(value: string | string[] | undefined): string | undefined {
+  return typeof value === 'string' ? value : value?.[0];
 }

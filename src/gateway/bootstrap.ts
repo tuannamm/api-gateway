@@ -1,4 +1,5 @@
 import { JwtAuthenticator } from './auth/jwt-authenticator';
+import { CachingPermissionResolver, RpcPermissionResolver } from './auth/permission-resolver';
 import { ConfigError } from './errors';
 import type { GatewayConfig } from './config';
 import { RegistryDiscovery } from './discovery/registry-discovery';
@@ -49,13 +50,31 @@ export async function buildGateway(config: GatewayConfig, logger?: GatewayLogger
     if (missing.length) logger?.warn(`No instance registered for: ${missing.join(', ')} (requests will get 503)`);
   });
 
+  const balancer = new RoundRobinBalancer();
+  const needsPermissions = spec.routes.some((r) => (r.permissions?.length ?? 0) > 0);
+  const permissionResolver = needsPermissions
+    ? new CachingPermissionResolver(
+        new RpcPermissionResolver({
+          project: config.project,
+          discovery,
+          transport,
+          balancer,
+          timeoutMs: config.rpcTimeoutMs,
+          maxAttempts: config.failoverMaxAttempts,
+        }),
+        { ttlMs: config.authz.cacheTtlMs, maxEntries: config.authz.cacheMaxEntries },
+      )
+    : undefined;
+
   const handler = new GatewayHandler({
     project: config.project,
     authenticator: config.auth ? new JwtAuthenticator(config.auth.issuer, config.auth.audience) : undefined,
+    permissionResolver,
+    corsOrigins: config.corsOrigins,
     routeTable,
     discovery,
     transport,
-    balancer: new RoundRobinBalancer(),
+    balancer,
     rpcTimeoutMs: config.rpcTimeoutMs,
     maxAttempts: config.failoverMaxAttempts,
     logger,

@@ -4,6 +4,7 @@ import path from 'node:path';
 import { createGatewayApp } from '../src/create-app';
 import {
   GatewayHandler,
+  RpcPermissionResolver,
   loadSpec,
   RoundRobinBalancer,
   RouteTable,
@@ -37,6 +38,7 @@ describe('Gateway (e2e)', () => {
     const table = new Map<string, Instance[]>([
       ...echoPatterns.map((p): [string, Instance[]] => [p, [echo1, echo2Dead]]),
       ['listOrdersOfUser', [order1]],
+      ['identity.authz.permissions', [echo1]],
       // "auth.login" cố ý không ai đăng ký → 503
     ]);
     const discovery: ServiceDiscovery = {
@@ -45,7 +47,7 @@ describe('Gateway (e2e)', () => {
     const transport = new TcpTransport();
     const config = {
       project: 'demo', specsDir: '', specPath: '', discovery: { url: 'http://registry.invalid', pollIntervalMs: 3_000 },
-      rpcTimeoutMs: 300, bodyLimit: 1024, failoverMaxAttempts: 3, port: 0,
+      rpcTimeoutMs: 300, bodyLimit: 1024, failoverMaxAttempts: 3, corsOrigins: [], authz: { cacheTtlMs: 30_000, cacheMaxEntries: 100 }, port: 0,
     };
     const gateway: Gateway = {
       config,
@@ -64,6 +66,20 @@ describe('Gateway (e2e)', () => {
       }),
     };
 
+    const protectedRoutes = RouteTable.from([{ method: 'get', path: '/protected/{id}', operationId: 'user.getById', successStatus: 200, requiresAuth: true, permissions: ['users:read'] }]);
+    const authzHandler = new GatewayHandler({ project: 'demo', routeTable: protectedRoutes, discovery, transport, balancer: new RoundRobinBalancer(), rpcTimeoutMs: 300, maxAttempts: 1, authenticator: { authenticate: async (header) => ({ sub: String(header), iss: 'test' }) }, permissionResolver: new RpcPermissionResolver({ project: 'demo', discovery, transport, balancer: new RoundRobinBalancer(), timeoutMs: 300, maxAttempts: 1 }) });
+    // Exercise HTTP through the real RPC resolver and a TCP fixture.
+    const authzApp = await createGatewayApp({ ...gateway, handler: authzHandler });
+    await authzApp.init();
+    await authzApp.getHttpAdapter().getInstance().ready();
+    try {
+      const allowed = await authzApp.inject({ method: 'GET', url: '/protected/42', headers: { authorization: 'allowed' } });
+      const denied = await authzApp.inject({ method: 'GET', url: '/protected/42', headers: { authorization: 'denied' } });
+      expect(allowed.statusCode).toBe(200);
+      expect(denied.statusCode).toBe(403);
+    } finally {
+      await authzApp.close();
+    }
     app = await createGatewayApp(gateway);
     await app.init();
     await app.getHttpAdapter().getInstance().ready();

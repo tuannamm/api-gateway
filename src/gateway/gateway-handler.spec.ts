@@ -332,3 +332,170 @@ describe('GatewayHandler: load balancing and failover', () => {
     expect(calls).toHaveLength(1);
   });
 });
+
+
+describe('GatewayHandler: permission check', () => {
+  const protectedRoutes: RouteDefinition[] = [
+    { method: 'get', path: '/users', operationId: 'users.list', successStatus: 200, requiresAuth: true, permissions: ['users:read'] },
+    { method: 'post', path: '/users', operationId: 'users.create', successStatus: 201, requiresAuth: true, permissions: ['users:read', 'users:write'] },
+    { method: 'get', path: '/me', operationId: 'me.get', successStatus: 200, requiresAuth: true, permissions: [] },
+    { method: 'get', path: '/open', operationId: 'open.get', successStatus: 200, requiresAuth: false },
+  ];
+
+  function build(permissionsOf?: (id: string) => Promise<ReadonlySet<string>>) {
+    const { transport, calls } = fakeTransport(() => ({ ok: true }));
+    const lookups: string[] = [];
+    const logs: string[] = [];
+    const handler = new GatewayHandler({
+      project: 'identity',
+      authenticator: { authenticate: async () => ({ sub: 'alice', iss: 'issuer' }) },
+      ...(permissionsOf && {
+        permissionResolver: {
+          permissionsOf: async (id) => {
+            lookups.push(id);
+            return permissionsOf(id);
+          },
+        },
+      }),
+      routeTable: RouteTable.from(protectedRoutes),
+      discovery: fakeDiscovery([instance]),
+      transport,
+      balancer: new RoundRobinBalancer(),
+      rpcTimeoutMs: 1000,
+      maxAttempts: 1,
+      logger: { warn: (m) => logs.push(m), error: (m) => logs.push(m) },
+    });
+    const handle = (method: string, url: string, body?: unknown) =>
+      handler.handle({ method, url, headers: { authorization: 'Bearer t' }, body });
+    return { handle, calls, lookups, logs };
+  }
+
+  it('forwards the request when every required permission is granted', async () => {
+    const { handle, calls, lookups } = build(async () => new Set(['users:read', 'users:write']));
+    expect((await handle('POST', '/users', {})).status).toBe(201);
+    expect(calls).toHaveLength(1);
+    expect(lookups).toEqual(['alice']);
+  });
+
+  it('returns 403 and never dispatches when a permission is missing (AND semantics)', async () => {
+    const { handle, calls } = build(async () => new Set(['users:read']));
+    const res = await handle('POST', '/users', {});
+    expect(res.status).toBe(403);
+    expect(res.body).toMatchObject({ code: 'FORBIDDEN' });
+    expect(JSON.stringify(res.body)).not.toContain('users:write');
+    expect(calls).toHaveLength(0);
+  });
+
+  it('skips the lookup when the route only needs authentication', async () => {
+    const { handle, lookups } = build(async () => new Set());
+    expect((await handle('GET', '/me')).status).toBe(200);
+    expect(lookups).toEqual([]);
+  });
+
+  it('fails closed with 503 when the lookup fails, without leaking the cause', async () => {
+    const { handle, calls, logs } = build(async () => {
+      throw new Error('mongodb://secret@host');
+    });
+    const res = await handle('GET', '/users');
+    expect(res.status).toBe(503);
+    expect(res.body).toMatchObject({ code: 'AUTHZ_UNAVAILABLE' });
+    expect(JSON.stringify(res.body)).not.toContain('secret');
+    expect(logs.join(' ')).toContain('permission lookup failed');
+    expect(calls).toHaveLength(0);
+  });
+
+  it('fails closed with 503 when a route needs permissions but no resolver exists', async () => {
+    const { handle, calls } = build();
+    expect((await handle('GET', '/users')).status).toBe(503);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('does not consult the resolver for public routes', async () => {
+    const { handle, lookups } = build(async () => new Set());
+    expect((await handle('GET', '/open')).status).toBe(200);
+    expect(lookups).toEqual([]);
+  });
+});
+
+
+describe('GatewayHandler: CORS', () => {
+  const ORIGIN = 'http://localhost:3001';
+  function build(corsOrigins?: string[]) {
+    const { transport, calls } = fakeTransport(() => ({ ok: true }));
+    const authenticate = jest.fn(async () => ({ sub: 'alice', iss: 'issuer' }));
+    const handler = new GatewayHandler({
+      project: 'identity',
+      authenticator: { authenticate },
+      ...(corsOrigins && { corsOrigins }),
+      routeTable: RouteTable.from([
+        { method: 'get', path: '/me', operationId: 'me.get', successStatus: 200, requiresAuth: true, permissions: [] },
+      ]),
+      discovery: fakeDiscovery([instance]),
+      transport,
+      balancer: new RoundRobinBalancer(),
+      rpcTimeoutMs: 1000,
+      maxAttempts: 1,
+    });
+    return { handler, calls, authenticate };
+  }
+  const preflight = (origin?: string) => ({
+    method: 'OPTIONS',
+    url: '/me',
+    headers: {
+      ...(origin && { origin }),
+      'access-control-request-method': 'GET',
+      'access-control-request-headers': 'authorization',
+    },
+  });
+
+  it('answers an allowed preflight with 204 before authentication, without dispatching', async () => {
+    const { handler, calls, authenticate } = build([ORIGIN]);
+    const res = await handler.handle(preflight(ORIGIN));
+    expect(res.status).toBe(204);
+    expect(res.headers).toMatchObject({
+      'access-control-allow-origin': ORIGIN,
+      'access-control-allow-headers': expect.stringContaining('authorization'),
+      vary: 'Origin',
+    });
+    expect(res.headers['access-control-allow-origin']).not.toBe('*');
+    expect(authenticate).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(0);
+  });
+
+  it('rejects a preflight from an unknown origin with 403 and no CORS headers', async () => {
+    const { handler } = build([ORIGIN]);
+    const res = await handler.handle(preflight('http://evil.example'));
+    expect(res.status).toBe(403);
+    expect(res.body).toMatchObject({ code: 'CORS_ORIGIN_NOT_ALLOWED' });
+    expect(res.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
+  it('adds CORS headers to a real response only for an allowed origin', async () => {
+    const { handler } = build([ORIGIN]);
+    const ok = await handler.handle({ method: 'GET', url: '/me', headers: { origin: ORIGIN, authorization: 'Bearer t' } });
+    expect(ok.status).toBe(200);
+    expect(ok.headers).toMatchObject({
+      'access-control-allow-origin': ORIGIN,
+      'access-control-expose-headers': 'x-request-id',
+      vary: 'Origin',
+    });
+    const other = await handler.handle({ method: 'GET', url: '/me', headers: { origin: 'http://evil.example', authorization: 'Bearer t' } });
+    expect(other.headers['access-control-allow-origin']).toBeUndefined();
+    expect(other.headers.vary).toBe('Origin');
+  });
+
+  it('keeps CORS headers on error responses so the browser can read the problem', async () => {
+    const { handler } = build([ORIGIN]);
+    const res = await handler.handle({ method: 'GET', url: '/missing', headers: { origin: ORIGIN } });
+    expect(res.status).toBe(404);
+    expect(res.headers['access-control-allow-origin']).toBe(ORIGIN);
+  });
+
+  it('is disabled when no origin is configured', async () => {
+    const { handler } = build();
+    const res = await handler.handle({ method: 'GET', url: '/me', headers: { origin: ORIGIN, authorization: 'Bearer t' } });
+    expect(res.headers['access-control-allow-origin']).toBeUndefined();
+    expect(res.headers.vary).toBeUndefined();
+    expect((await handler.handle(preflight(ORIGIN))).status).toBe(405);
+  });
+});

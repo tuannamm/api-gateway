@@ -25,6 +25,11 @@ class EchoFixtureController {
     return { echo: req };
   }
 
+  @MessagePattern('identity.authz.permissions')
+  permissions(@Payload() req: GatewayRequest) {
+    return { permissions: req.params.id === 'allowed' ? ['users:read'] : [] };
+  }
+
   @MessagePattern('user.create')
   create(@Payload() req: GatewayRequest) {
     return { created: req.body };
