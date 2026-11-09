@@ -242,7 +242,11 @@
             }
           },
           "profile": {
-            "$ref": "#/components/schemas/UserProfile"
+            "description": "Null until the first profile update; reading does not create a profile.",
+            "anyOf": [
+              { "$ref": "#/components/schemas/UserProfile" },
+              { "type": "object", "nullable": true, "enum": [null] }
+            ]
           }
         },
         "required": [

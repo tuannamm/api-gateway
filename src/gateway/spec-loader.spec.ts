@@ -24,6 +24,13 @@ function doc(paths: Record<string, unknown>): OpenAPI.Document {
 const ok = { responses: { '200': { description: 'OK' } } };
 
 describe('loadSpec', () => {
+  it('accepts the identity contract with a nullable profile before its first update', async () => {
+    const spec = await loadSpec(path.resolve(__dirname, '../../specs/identity/openapi.yml'));
+    expect(spec.routes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ operationId: 'identity.me.get', successStatus: 200 }),
+      expect.objectContaining({ operationId: 'identity.me.updateProfile', successStatus: 200 }),
+    ]));
+  });
   it('compiles a valid spec into routes', async () => {
     const spec = await loadSpec(fixture('demo'));
 
