@@ -24,6 +24,8 @@ export interface GatewayConfig {
   corsOrigins: string[];
   /** Cache permission của user (xem CachingPermissionResolver). */
   authz: { cacheTtlMs: number; cacheMaxEntries: number };
+  /** Rate limit fixed window theo IP. Không đặt = tắt. */
+  rateLimit?: { max: number; windowMs: number };
   port: number;
 }
 
@@ -41,6 +43,7 @@ const DEFAULT_RPC_TIMEOUT_MS = 10_000;
 const DEFAULT_BODY_LIMIT = 1024 * 1024; // 1 MB
 const DEFAULT_FAILOVER_MAX_ATTEMPTS = 3;
 const DEFAULT_PORT = 3000;
+const DEFAULT_RATE_LIMIT_WINDOW_MS = 60_000;
 const DEFAULT_AUTHZ_CACHE_TTL_MS = 30_000;
 const DEFAULT_AUTHZ_CACHE_MAX_ENTRIES = 10_000;
 
@@ -109,7 +112,17 @@ export function loadConfig(
       cacheTtlMs: positiveInt(env, 'AUTHZ_CACHE_TTL_MS', DEFAULT_AUTHZ_CACHE_TTL_MS, 3_600_000),
       cacheMaxEntries: positiveInt(env, 'AUTHZ_CACHE_MAX_ENTRIES', DEFAULT_AUTHZ_CACHE_MAX_ENTRIES, 1_000_000),
     },
+    rateLimit: loadRateLimitConfig(env),
     port: positiveInt(env, 'PORT', DEFAULT_PORT, 65_535),
+  };
+}
+
+/** Bật bằng GATEWAY_RATE_LIMIT_MAX (số request/cửa sổ); GATEWAY_RATE_LIMIT_WINDOW_MS tuỳ chọn (mặc định 60s). */
+function loadRateLimitConfig(env: NodeJS.ProcessEnv): GatewayConfig['rateLimit'] {
+  if (!env.GATEWAY_RATE_LIMIT_MAX?.trim()) return undefined;
+  return {
+    max: positiveInt(env, 'GATEWAY_RATE_LIMIT_MAX', 0, 1_000_000),
+    windowMs: positiveInt(env, 'GATEWAY_RATE_LIMIT_WINDOW_MS', DEFAULT_RATE_LIMIT_WINDOW_MS, 86_400_000),
   };
 }
 

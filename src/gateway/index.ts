@@ -33,3 +33,10 @@ export {
   RpcPermissionResolver,
   type PermissionResolver,
 } from './auth/permission-resolver';
+export {
+  FixedWindowRateLimiter,
+  InMemoryFixedWindowStore,
+  type FixedWindowOptions,
+  type RateLimitResult,
+  type RateLimitStore,
+} from './rate-limit/fixed-window';

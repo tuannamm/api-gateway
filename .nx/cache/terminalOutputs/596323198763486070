@@ -1,0 +1,91 @@
+> npm run test:e2e -- --runInBand
+
+
+> api-gateway@0.0.1 test:e2e
+> NODE_OPTIONS=--experimental-vm-modules jest --config ./test/jest-e2e.json --runInBand
+
+(node:28986) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:28986) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+[0m[7m[1m[31m FAIL [39m[22m[27m[0m [2mtest/[22m[1mgateway.e2e-spec.ts[22m
+[1m[31m  [1m● [22m[1mGateway (e2e) › 200: translates HTTP into a message and returns the service result[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1m[31m  [1m● [22m[1mGateway (e2e) › fails over from a dead instance: every request still succeeds[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1m[31m  [1m● [22m[1mGateway (e2e) › keeps a valid x-request-id sent by the client[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1m[31m  [1m● [22m[1mGateway (e2e) › 201: success status comes from the spec[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1m[31m  [1m● [22m[1mGateway (e2e) › 204: no body[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1m[31m  [1m● [22m[1mGateway (e2e) › 404 from the service: business error mapped to problem+json[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1m[31m  [1m● [22m[1mGateway (e2e) › GET /nope → 404 ROUTE_NOT_FOUND[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1m[31m  [1m● [22m[1mGateway (e2e) › PUT /users/42 → 405 METHOD_NOT_ALLOWED[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1m[31m  [1m● [22m[1mGateway (e2e) › GET /users/%E0%A4%A → 400 INVALID_PATH[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1m[31m  [1m● [22m[1mGateway (e2e) › POST /auth/login → 503 NO_INSTANCE[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1m[31m  [1m● [22m[1mGateway (e2e) › GET /users/7/orders → 502 UPSTREAM_UNAVAILABLE[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1m[31m  [1m● [22m[1mGateway (e2e) › GET /users/me → 502 PATTERN_NOT_HANDLED[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1m[31m  [1m● [22m[1mGateway (e2e) › GET /users → 502 UPSTREAM_ERROR[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1m[31m  [1m● [22m[1mGateway (e2e) › GET /users/slow → 504 UPSTREAM_TIMEOUT[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1m[31m  [1m● [22m[1mGateway (e2e) › 405 carries the Allow header[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1m[31m  [1m● [22m[1mGateway (e2e) › 413 when the body exceeds the limit[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1m[31m  [1m● [22m[1mGateway (e2e) › 415 for non-JSON bodies, 400 for broken JSON[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1mTest Suites: [22m[1m[31m1 failed[39m[22m, 1 total
+[1mTests:       [22m[1m[31m17 failed[39m[22m, 17 total
+[1mSnapshots:   [22m0 total
+[1mTime:[22m        0.284 s, estimated 1 s
+[2mRan all test suites[22m[2m.[22m
+npm error Lifecycle script `test:e2e` failed with error:
+npm error code 1
+npm error path /Users/nguyentrantuannam/Workspace/workspace-project-management/project-management/apps/api-gateway
+npm error workspace api-gateway@0.0.1
+npm error location /Users/nguyentrantuannam/Workspace/workspace-project-management/project-management/apps/api-gateway
+npm error command failed
+npm error command sh -c NODE_OPTIONS=--experimental-vm-modules jest --config ./test/jest-e2e.json --runInBand
+Warning: command "npm run test:e2e -- --runInBand" exited with non-zero status code

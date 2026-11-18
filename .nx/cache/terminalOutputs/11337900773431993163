@@ -1,0 +1,298 @@
+> npm test -- --runInBand
+
+
+> api-gateway@0.0.1 test
+> NODE_OPTIONS=--experimental-vm-modules jest --runInBand
+
+(node:28174) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:28174) ExperimentalWarning: VM Modules is an experimental feature and might change at any time
+[0m[7m[1m[31m FAIL [39m[22m[27m[0m [2msrc/gateway/transport/[22m[1mtcp-transport.spec.ts[22m
+[1m[31m  [1m● [22m[1mTcpTransport › sends a message and returns the response[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1m[31m  [1m● [22m[1mTcpTransport › sends a message and returns the response[39m[22m
+
+    TypeError: Cannot read properties of undefined (reading 'close')
+
+[2m      32 |[22m
+[2m      33 |   afterEach(async () => {[22m
+[2m    > 34 |     await transport.close();[22m
+[2m         |                     ^[22m
+[2m      35 |   });[22m
+[2m      36 |[22m
+[2m      37 |   afterAll(async () => {[22m
+
+[2m      [2mat Object.<anonymous> ([22m[2m[0m[36msrc/gateway/transport/tcp-transport.spec.ts[39m[0m[2m:34:21)[22m[2m[22m
+
+[1m[31m  [1m● [22m[1mTcpTransport › reuses one connection per host:port[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1m[31m  [1m● [22m[1mTcpTransport › reuses one connection per host:port[39m[22m
+
+    TypeError: Cannot read properties of undefined (reading 'close')
+
+[2m      32 |[22m
+[2m      33 |   afterEach(async () => {[22m
+[2m    > 34 |     await transport.close();[22m
+[2m         |                     ^[22m
+[2m      35 |   });[22m
+[2m      36 |[22m
+[2m      37 |   afterAll(async () => {[22m
+
+[2m      [2mat Object.<anonymous> ([22m[2m[0m[36msrc/gateway/transport/tcp-transport.spec.ts[39m[0m[2m:34:21)[22m[2m[22m
+
+[1m[31m  [1m● [22m[1mTcpTransport › resolves undefined when the handler returns nothing[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1m[31m  [1m● [22m[1mTcpTransport › resolves undefined when the handler returns nothing[39m[22m
+
+    TypeError: Cannot read properties of undefined (reading 'close')
+
+[2m      32 |[22m
+[2m      33 |   afterEach(async () => {[22m
+[2m    > 34 |     await transport.close();[22m
+[2m         |                     ^[22m
+[2m      35 |   });[22m
+[2m      36 |[22m
+[2m      37 |   afterAll(async () => {[22m
+
+[2m      [2mat Object.<anonymous> ([22m[2m[0m[36msrc/gateway/transport/tcp-transport.spec.ts[39m[0m[2m:34:21)[22m[2m[22m
+
+[1m[31m  [1m● [22m[1mTcpTransport › wraps a service RpcException as RpcRemoteError with the original payload[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1m[31m  [1m● [22m[1mTcpTransport › wraps a service RpcException as RpcRemoteError with the original payload[39m[22m
+
+    TypeError: Cannot read properties of undefined (reading 'close')
+
+[2m      32 |[22m
+[2m      33 |   afterEach(async () => {[22m
+[2m    > 34 |     await transport.close();[22m
+[2m         |                     ^[22m
+[2m      35 |   });[22m
+[2m      36 |[22m
+[2m      37 |   afterAll(async () => {[22m
+
+[2m      [2mat Object.<anonymous> ([22m[2m[0m[36msrc/gateway/transport/tcp-transport.spec.ts[39m[0m[2m:34:21)[22m[2m[22m
+
+[1m[31m  [1m● [22m[1mTcpTransport › detects a pattern the service does not handle[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1m[31m  [1m● [22m[1mTcpTransport › detects a pattern the service does not handle[39m[22m
+
+    TypeError: Cannot read properties of undefined (reading 'close')
+
+[2m      32 |[22m
+[2m      33 |   afterEach(async () => {[22m
+[2m    > 34 |     await transport.close();[22m
+[2m         |                     ^[22m
+[2m      35 |   });[22m
+[2m      36 |[22m
+[2m      37 |   afterAll(async () => {[22m
+
+[2m      [2mat Object.<anonymous> ([22m[2m[0m[36msrc/gateway/transport/tcp-transport.spec.ts[39m[0m[2m:34:21)[22m[2m[22m
+
+[1m[31m  [1m● [22m[1mTcpTransport › times out[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1m[31m  [1m● [22m[1mTcpTransport › times out[39m[22m
+
+    TypeError: Cannot read properties of undefined (reading 'close')
+
+[2m      32 |[22m
+[2m      33 |   afterEach(async () => {[22m
+[2m    > 34 |     await transport.close();[22m
+[2m         |                     ^[22m
+[2m      35 |   });[22m
+[2m      36 |[22m
+[2m      37 |   afterAll(async () => {[22m
+
+[2m      [2mat Object.<anonymous> ([22m[2m[0m[36msrc/gateway/transport/tcp-transport.spec.ts[39m[0m[2m:34:21)[22m[2m[22m
+
+[1m[31m  [1m● [22m[1mTcpTransport › reports an unreachable instance as NOT delivered and evicts it from the pool[39m[22m
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[1m[31m  [1m● [22m[1mTcpTransport › reports an unreachable instance as NOT delivered and evicts it from the pool[39m[22m
+
+    TypeError: Cannot read properties of undefined (reading 'close')
+
+[2m      32 |[22m
+[2m      33 |   afterEach(async () => {[22m
+[2m    > 34 |     await transport.close();[22m
+[2m         |                     ^[22m
+[2m      35 |   });[22m
+[2m      36 |[22m
+[2m      37 |   afterAll(async () => {[22m
+
+[2m      [2mat Object.<anonymous> ([22m[2m[0m[36msrc/gateway/transport/tcp-transport.spec.ts[39m[0m[2m:34:21)[22m[2m[22m
+
+
+  [1m● [22mTest suite failed to run
+
+    TypeError: Cannot read properties of undefined (reading 'close')
+
+      36 |
+      37 |   afterAll(async () => {
+    > 38 |     await echo.close();
+         |                ^
+      39 |   });
+      40 |
+      41 |   it('sends a message and returns the response', async () => {
+
+      [2mat Object.<anonymous> ([22msrc/gateway/transport/tcp-transport.spec.ts[2m:38:16)[22m
+
+[0m[7m[1m[31m FAIL [39m[22m[27m[0m [2msrc/gateway/auth/[22m[1mjwt-authenticator.spec.ts[22m ([0m[1m[41m5.115 s[49m[22m[0m)
+[1m[31m  [1m● [22m[1mKeycloak JWT verification › accepts verified claims only[39m[22m
+
+    thrown: "Exceeded timeout of 5000 ms for a hook.
+    Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout."
+
+[2m      [2mat _getError ([22m[2m../../node_modules/jest-circus/build/jestAdapterInit.js[2m:1985:12)[22m[2m[22m
+[2m          at Array.map (<anonymous>)[22m
+
+    Cause:
+        thrown: "Exceeded timeout of 5000 ms for a hook.
+        Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout."
+
+    [2m      12 |   let key: Awaited<ReturnType<typeof generateKeyPair>>;[22m
+    [2m      13 |   let jwks: object[];[22m
+    [2m    > 14 |   beforeAll(async () => {[22m
+    [2m         |   ^[22m
+    [2m      15 |     key = await generateKeyPair('RS256');[22m
+    [2m      16 |     jwks = [{ ...await exportJWK(key.publicKey), kid: 'one', alg: 'RS256' }];[22m
+    [2m      17 |     server = createServer((_req, res) => { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ keys: jwks })); });[22m
+
+    [2m      [2mat [22m[2m[0m[36msrc/gateway/auth/jwt-authenticator.spec.ts[39m[0m[2m:14:3[22m[2m[22m
+    [2m      [2mat Object.<anonymous> ([22m[2m[0m[36msrc/gateway/auth/jwt-authenticator.spec.ts[39m[0m[2m:10:1)[22m[2m[22m
+
+[1m[31m  [1m● [22m[1mKeycloak JWT verification › rejects missing, expired, wrong audience, issuer, signature and token type[39m[22m
+
+    thrown: "Exceeded timeout of 5000 ms for a hook.
+    Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout."
+
+[2m      [2mat _getError ([22m[2m../../node_modules/jest-circus/build/jestAdapterInit.js[2m:1985:12)[22m[2m[22m
+[2m          at Array.map (<anonymous>)[22m
+
+    Cause:
+        thrown: "Exceeded timeout of 5000 ms for a hook.
+        Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout."
+
+    [2m      12 |   let key: Awaited<ReturnType<typeof generateKeyPair>>;[22m
+    [2m      13 |   let jwks: object[];[22m
+    [2m    > 14 |   beforeAll(async () => {[22m
+    [2m         |   ^[22m
+    [2m      15 |     key = await generateKeyPair('RS256');[22m
+    [2m      16 |     jwks = [{ ...await exportJWK(key.publicKey), kid: 'one', alg: 'RS256' }];[22m
+    [2m      17 |     server = createServer((_req, res) => { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ keys: jwks })); });[22m
+
+    [2m      [2mat [22m[2m[0m[36msrc/gateway/auth/jwt-authenticator.spec.ts[39m[0m[2m:14:3[22m[2m[22m
+    [2m      [2mat Object.<anonymous> ([22m[2m[0m[36msrc/gateway/auth/jwt-authenticator.spec.ts[39m[0m[2m:10:1)[22m[2m[22m
+
+[1m[31m  [1m● [22m[1mKeycloak JWT verification › refreshes JWKS when key rotates[39m[22m
+
+    thrown: "Exceeded timeout of 5000 ms for a hook.
+    Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout."
+
+[2m      [2mat _getError ([22m[2m../../node_modules/jest-circus/build/jestAdapterInit.js[2m:1985:12)[22m[2m[22m
+[2m          at Array.map (<anonymous>)[22m
+
+    Cause:
+        thrown: "Exceeded timeout of 5000 ms for a hook.
+        Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout."
+
+    [2m      12 |   let key: Awaited<ReturnType<typeof generateKeyPair>>;[22m
+    [2m      13 |   let jwks: object[];[22m
+    [2m    > 14 |   beforeAll(async () => {[22m
+    [2m         |   ^[22m
+    [2m      15 |     key = await generateKeyPair('RS256');[22m
+    [2m      16 |     jwks = [{ ...await exportJWK(key.publicKey), kid: 'one', alg: 'RS256' }];[22m
+    [2m      17 |     server = createServer((_req, res) => { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ keys: jwks })); });[22m
+
+    [2m      [2mat [22m[2m[0m[36msrc/gateway/auth/jwt-authenticator.spec.ts[39m[0m[2m:14:3[22m[2m[22m
+    [2m      [2mat Object.<anonymous> ([22m[2m[0m[36msrc/gateway/auth/jwt-authenticator.spec.ts[39m[0m[2m:10:1)[22m[2m[22m
+
+[1m[31m  [1m● [22m[1mKeycloak JWT verification › protects default routes and never dispatches unverified requests[39m[22m
+
+    thrown: "Exceeded timeout of 5000 ms for a hook.
+    Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout."
+
+[2m      [2mat _getError ([22m[2m../../node_modules/jest-circus/build/jestAdapterInit.js[2m:1985:12)[22m[2m[22m
+[2m          at Array.map (<anonymous>)[22m
+
+    Cause:
+        thrown: "Exceeded timeout of 5000 ms for a hook.
+        Add a timeout value to this test to increase the timeout, if this is a long-running test. See https://jestjs.io/docs/api#testname-fn-timeout."
+
+    [2m      12 |   let key: Awaited<ReturnType<typeof generateKeyPair>>;[22m
+    [2m      13 |   let jwks: object[];[22m
+    [2m    > 14 |   beforeAll(async () => {[22m
+    [2m         |   ^[22m
+    [2m      15 |     key = await generateKeyPair('RS256');[22m
+    [2m      16 |     jwks = [{ ...await exportJWK(key.publicKey), kid: 'one', alg: 'RS256' }];[22m
+    [2m      17 |     server = createServer((_req, res) => { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ keys: jwks })); });[22m
+
+    [2m      [2mat [22m[2m[0m[36msrc/gateway/auth/jwt-authenticator.spec.ts[39m[0m[2m:14:3[22m[2m[22m
+    [2m      [2mat Object.<anonymous> ([22m[2m[0m[36msrc/gateway/auth/jwt-authenticator.spec.ts[39m[0m[2m:10:1)[22m[2m[22m
+
+[1m[31m  [1m● [22m[1mOpenAPI security › defaults to protected and allows explicit public routes[39m[22m
+
+    SpecValidationError: Invalid OpenAPI spec "<in-memory>" (1 issue(s)):
+      - GET /me: public route (security: []) must not declare x-required-permissions.
+
+[2m      134 |   }[22m
+[2m      135 |[22m
+[2m    > 136 |   if (issues.length > 0) throw new SpecValidationError(specPath, issues);[22m
+[2m          |                                ^[22m
+[2m      137 |   return routes;[22m
+[2m      138 | }[22m
+[2m      139 |[22m
+
+[2m      [2mat extractRoutes ([22m[2msrc/gateway/spec-loader.ts[2m:136:32)[22m[2m[22m
+[2m      [2mat Object.<anonymous> ([22m[2m[0m[36msrc/gateway/auth/jwt-authenticator.spec.ts[39m[0m[2m:60:25)[22m[2m[22m
+
+
+  [1m● [22mTest suite failed to run
+
+    listen EPERM: operation not permitted 127.0.0.1
+
+[0m[7m[1m[31m FAIL [39m[22m[27m[0m [2msrc/gateway/[22m[1mspec-loader.spec.ts[22m
+[1m[31m  [1m● [22m[1mloadSpec › reports ALL gateway rule violations at once[39m[22m
+
+    [2mexpect([22m[31mreceived[39m[2m).[22mtoHaveLength[2m([22m[32mexpected[39m[2m)[22m
+
+    Expected length: [32m3[39m
+    Received length: [31m4[39m
+    Received array:  [31m["GET /a: missing operationId (required by the gateway).", "GET /b: operationId must not be empty.", "GET /c: missing x-required-permissions (use [] when any authenticated user may call it).", "POST /c: duplicate operationId \"shared.op\" (already used by GET /c)."][39m
+
+[2m      61 |     const error = await expectSpecError(() => loadSpec(fixture('broken')));[22m
+[2m      62 |[22m
+[2m    > 63 |     expect(error.issues).toHaveLength(3);[22m
+[2m         |                          ^[22m
+[2m      64 |     expect(error.issues[0]).toMatch(/GET \/a: missing operationId/);[22m
+[2m      65 |     expect(error.issues[1]).toMatch(/GET \/b: operationId must not be empty/);[22m
+[2m      66 |     expect(error.issues[2]).toMatch(/POST \/c: duplicate operationId "shared.op"/);[22m
+
+[2m      [2mat Object.<anonymous> ([22m[2m[0m[36msrc/gateway/spec-loader.spec.ts[39m[0m[2m:63:26)[22m[2m[22m
+
+
+[1mTest Suites: [22m[1m[31m3 failed[39m[22m, [1m[32m8 passed[39m[22m, 11 total
+[1mTests:       [22m[1m[31m13 failed[39m[22m, [1m[32m150 passed[39m[22m, 163 total
+[1mSnapshots:   [22m0 total
+[1mTime:[22m        [1m[33m5.673 s[39m[22m
+[2mRan all test suites[22m[2m.[22m
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /Users/nguyentrantuannam/Workspace/workspace-project-management/project-management/apps/api-gateway
+npm error workspace api-gateway@0.0.1
+npm error location /Users/nguyentrantuannam/Workspace/workspace-project-management/project-management/apps/api-gateway
+npm error command failed
+npm error command sh -c NODE_OPTIONS=--experimental-vm-modules jest --runInBand
+Warning: command "npm test -- --runInBand" exited with non-zero status code

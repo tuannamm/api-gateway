@@ -1,0 +1,21 @@
+{
+  "run": {
+    "command": "nx run api-gateway:test:e2e --output-style=static",
+    "startTime": "2026-11-09T07:24:38.254Z",
+    "endTime": "2026-11-09T07:24:38.838Z",
+    "inner": false
+  },
+  "tasks": [
+    {
+      "taskId": "api-gateway:test:e2e",
+      "target": "test:e2e",
+      "projectName": "api-gateway",
+      "hash": "596323198763486070",
+      "startTime": "2026-11-09T07:24:38.258Z",
+      "endTime": "2026-11-09T07:24:38.836Z",
+      "params": "",
+      "cacheStatus": "cache-miss",
+      "status": 1
+    }
+  ]
+}

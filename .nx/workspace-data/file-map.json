@@ -1,0 +1,283 @@
+{
+  "version": "6.0",
+  "nxVersion": "24.0.0",
+  "pathMappings": {},
+  "nxJsonPlugins": [],
+  "fileMap": {
+    "projectFileMap": {
+      "api-gateway": [
+        {
+          "file": ".env.identity.example",
+          "hash": "12916996293725013576"
+        },
+        {
+          "file": ".gitignore",
+          "hash": "9169017350320844333"
+        },
+        {
+          "file": ".nvmrc",
+          "hash": "6929075154623388995"
+        },
+        {
+          "file": ".prettierrc",
+          "hash": "9555875142989992828"
+        },
+        {
+          "file": "README.md",
+          "hash": "2114108101677660401"
+        },
+        {
+          "file": "documents/INTERVIEW-QUESTIONS.md",
+          "hash": "14068364989268822856"
+        },
+        {
+          "file": "documents/KNOWLEDGE.md",
+          "hash": "15180598776863555590"
+        },
+        {
+          "file": "documents/PLAN.md",
+          "hash": "3486374341768113597"
+        },
+        {
+          "file": "documents/SLIDES.md",
+          "hash": "9554678321288972411"
+        },
+        {
+          "file": "jest.config.ts",
+          "hash": "8815866998688913440"
+        },
+        {
+          "file": "nest-cli.json",
+          "hash": "789240945379598733"
+        },
+        {
+          "file": "nx.json",
+          "hash": "3267886288189484075"
+        },
+        {
+          "file": "oxlint.json",
+          "hash": "16646439548347765173"
+        },
+        {
+          "file": "package-lock.json",
+          "hash": "4724302599369916030"
+        },
+        {
+          "file": "package.json",
+          "hash": "18223203768108698480",
+          "deps": [
+            "npm:@nestjs/cli",
+            "npm:@nestjs/mau",
+            "npm:@nestjs/schematics",
+            "npm:@nestjs/testing",
+            "npm:@types/jest",
+            "npm:@types/node",
+            "npm:@types/supertest",
+            "npm:jest",
+            "npm:marked",
+            "npm:oxlint",
+            "npm:prettier",
+            "npm:source-map-support",
+            "npm:supertest",
+            "npm:ts-jest",
+            "npm:ts-loader",
+            "npm:ts-node",
+            "npm:tsconfig-paths",
+            "npm:typescript",
+            "npm:@apidevtools/swagger-parser",
+            "npm:@nestjs/common",
+            "npm:@nestjs/core",
+            "npm:@nestjs/microservices",
+            "npm:@nestjs/platform-fastify",
+            "npm:jose",
+            "npm:openapi-types",
+            "npm:reflect-metadata",
+            "npm:rxjs"
+          ]
+        },
+        {
+          "file": "project.json",
+          "hash": "11248924706571138556"
+        },
+        {
+          "file": "specs/example/openapi.yml",
+          "hash": "12697679172813028231"
+        },
+        {
+          "file": "specs/identity/openapi.yml",
+          "hash": "7526725952051083298"
+        },
+        {
+          "file": "src/create-app.ts",
+          "hash": "7849387572328713565"
+        },
+        {
+          "file": "src/gateway.controller.ts",
+          "hash": "81733023833324470"
+        },
+        {
+          "file": "src/gateway.module.ts",
+          "hash": "5999980753014900578"
+        },
+        {
+          "file": "src/gateway/auth/jwt-authenticator.spec.ts",
+          "hash": "2021988106966751925"
+        },
+        {
+          "file": "src/gateway/auth/jwt-authenticator.ts",
+          "hash": "4634434806179043149"
+        },
+        {
+          "file": "src/gateway/auth/permission-resolver.spec.ts",
+          "hash": "13269799935858715484"
+        },
+        {
+          "file": "src/gateway/auth/permission-resolver.ts",
+          "hash": "5481620068841215109"
+        },
+        {
+          "file": "src/gateway/bootstrap.ts",
+          "hash": "7978535335945764561"
+        },
+        {
+          "file": "src/gateway/config.spec.ts",
+          "hash": "14768339726009604418"
+        },
+        {
+          "file": "src/gateway/config.ts",
+          "hash": "453119477182638969"
+        },
+        {
+          "file": "src/gateway/contracts.ts",
+          "hash": "2231350321298386061"
+        },
+        {
+          "file": "src/gateway/discovery/registry-discovery.spec.ts",
+          "hash": "1081370088238131042"
+        },
+        {
+          "file": "src/gateway/discovery/registry-discovery.ts",
+          "hash": "17163313054601444902"
+        },
+        {
+          "file": "src/gateway/discovery/types.ts",
+          "hash": "1042249163930876766"
+        },
+        {
+          "file": "src/gateway/errors.ts",
+          "hash": "9049253252190292138"
+        },
+        {
+          "file": "src/gateway/gateway-handler.spec.ts",
+          "hash": "8378862480007261836"
+        },
+        {
+          "file": "src/gateway/gateway-handler.ts",
+          "hash": "16550293125170338845"
+        },
+        {
+          "file": "src/gateway/index.ts",
+          "hash": "10199537912348007264"
+        },
+        {
+          "file": "src/gateway/load-balancer.spec.ts",
+          "hash": "10449523645639951882"
+        },
+        {
+          "file": "src/gateway/load-balancer.ts",
+          "hash": "11688069547287449865"
+        },
+        {
+          "file": "src/gateway/problem.spec.ts",
+          "hash": "17274476856761507288"
+        },
+        {
+          "file": "src/gateway/problem.ts",
+          "hash": "18307283125215950646"
+        },
+        {
+          "file": "src/gateway/request-id.spec.ts",
+          "hash": "6588858040769771709"
+        },
+        {
+          "file": "src/gateway/request-id.ts",
+          "hash": "4143050906416150972"
+        },
+        {
+          "file": "src/gateway/route-table.spec.ts",
+          "hash": "1474262269910362842"
+        },
+        {
+          "file": "src/gateway/route-table.ts",
+          "hash": "11876228990052090876"
+        },
+        {
+          "file": "src/gateway/spec-loader.spec.ts",
+          "hash": "1643239665642390859"
+        },
+        {
+          "file": "src/gateway/spec-loader.ts",
+          "hash": "5921600542414798479"
+        },
+        {
+          "file": "src/gateway/transport/tcp-transport.spec.ts",
+          "hash": "14130085530806689562"
+        },
+        {
+          "file": "src/gateway/transport/tcp-transport.ts",
+          "hash": "4412170951589978731"
+        },
+        {
+          "file": "src/gateway/transport/types.ts",
+          "hash": "4418089234762727047"
+        },
+        {
+          "file": "src/gateway/types.ts",
+          "hash": "13732165657814508457"
+        },
+        {
+          "file": "src/main.ts",
+          "hash": "643267103239890940"
+        },
+        {
+          "file": "src/problem.filter.ts",
+          "hash": "15096822831893517185"
+        },
+        {
+          "file": "test/fixtures/specs/broken/openapi.yml",
+          "hash": "4797950446113002693"
+        },
+        {
+          "file": "test/fixtures/specs/demo/openapi.yml",
+          "hash": "7951679932511133278"
+        },
+        {
+          "file": "test/fixtures/specs/not-openapi/openapi.yml",
+          "hash": "10521024139187487122"
+        },
+        {
+          "file": "test/gateway.e2e-spec.ts",
+          "hash": "17792516006845385392"
+        },
+        {
+          "file": "test/jest-e2e.json",
+          "hash": "7570273541430074424"
+        },
+        {
+          "file": "test/support/echo-fixture.ts",
+          "hash": "14276890762630062508"
+        },
+        {
+          "file": "tsconfig.build.json",
+          "hash": "2657251526716671579"
+        },
+        {
+          "file": "tsconfig.json",
+          "hash": "851017163015786390"
+        }
+      ]
+    },
+    "nonProjectFiles": []
+  },
+  "externalNodesHash": "16209868010690665499"
+}

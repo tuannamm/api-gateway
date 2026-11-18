@@ -31,12 +31,15 @@ export class ProblemExceptionFilter implements ExceptionFilter {
     const error = this.toGatewayError(exception, requestId);
     void reply
       .status(error.status)
+      .headers(error.headers)
       .header(REQUEST_ID_HEADER, requestId)
       .header('content-type', PROBLEM_CONTENT_TYPE)
       .send(JSON.stringify(toProblem(error, requestId, request.url.split('?')[0])));
   }
 
   private toGatewayError(exception: unknown, requestId: string): GatewayError {
+    // Lỗi do guard/hook ném ra (VD 429 từ RateLimitGuard) đã mang sẵn status, code và header.
+    if (exception instanceof GatewayError) return exception;
     if (exception instanceof HttpException && exception.getStatus() < 500) {
       const status = exception.getStatus();
       return new GatewayError(status, CODE_BY_STATUS[status] ?? `HTTP_${status}`, exception.message);
